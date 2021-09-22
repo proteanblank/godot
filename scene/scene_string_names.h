@@ -84,6 +84,8 @@ public:
 
 	StringName mouse_entered;
 	StringName mouse_exited;
+	StringName mouse_shape_entered;
+	StringName mouse_shape_exited;
 	StringName focus_entered;
 	StringName focus_exited;
 
@@ -96,6 +98,7 @@ public:
 	StringName animation_started;
 
 	StringName pose_updated;
+	StringName bone_pose_changed;
 
 	StringName body_shape_entered;
 	StringName body_entered;
@@ -107,9 +110,6 @@ public:
 
 	StringName _body_inout;
 	StringName _area_inout;
-
-	StringName _get_gizmo_geometry;
-	StringName _can_gizmo_scale;
 
 	StringName _physics_process;
 	StringName _process;
@@ -154,6 +154,7 @@ public:
 
 	StringName _spatial_editor_group;
 	StringName _request_gizmo;
+	StringName _clear_subgizmo_selection;
 
 	StringName offset;
 	StringName unit_offset;
@@ -181,6 +182,8 @@ public:
 
 	StringName _mouse_enter;
 	StringName _mouse_exit;
+	StringName _mouse_shape_enter;
+	StringName _mouse_shape_exit;
 
 	StringName frame_changed;
 	StringName texture_changed;

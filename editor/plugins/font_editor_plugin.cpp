@@ -34,7 +34,7 @@
 
 void FontDataPreview::_notification(int p_what) {
 	if (p_what == NOTIFICATION_DRAW) {
-		Color text_color = get_theme_color("font_color", "Label");
+		Color text_color = get_theme_color(SNAME("font_color"), SNAME("Label"));
 		Color line_color = text_color;
 		line_color.a *= 0.6;
 		Vector2 pos = (get_size() - line->get_size()) / 2;
@@ -50,229 +50,30 @@ Size2 FontDataPreview::get_minimum_size() const {
 	return Vector2(64, 64) * EDSCALE;
 }
 
-struct FSample {
-	String script;
-	String sample;
-};
-
-static FSample _samples[] = {
-	{ "hani", U"漢字" },
-	{ "armn", U"Աբ" },
-	{ "copt", U"Αα" },
-	{ "cyrl", U"Аб" },
-	{ "grek", U"Αα" },
-	{ "hebr", U"אב" },
-	{ "arab", U"اب" },
-	{ "syrc", U"ܐܒ" },
-	{ "thaa", U"ހށ" },
-	{ "deva", U"आ" },
-	{ "beng", U"আ" },
-	{ "guru", U"ਆ" },
-	{ "gujr", U"આ" },
-	{ "orya", U"ଆ" },
-	{ "taml", U"ஆ" },
-	{ "telu", U"ఆ" },
-	{ "knda", U"ಆ" },
-	{ "mylm", U"ആ" },
-	{ "sinh", U"ආ" },
-	{ "thai", U"กิ" },
-	{ "laoo", U"ກິ" },
-	{ "tibt", U"ༀ" },
-	{ "mymr", U"က" },
-	{ "geor", U"Ⴀა" },
-	{ "hang", U"한글" },
-	{ "ethi", U"ሀ" },
-	{ "cher", U"Ꭳ" },
-	{ "cans", U"ᐁ" },
-	{ "ogam", U"ᚁ" },
-	{ "runr", U"ᚠ" },
-	{ "tglg", U"ᜀ" },
-	{ "hano", U"ᜠ" },
-	{ "buhd", U"ᝀ" },
-	{ "tagb", U"ᝠ" },
-	{ "khmr", U"ក" },
-	{ "mong", U"ᠠ" },
-	{ "limb", U"ᤁ" },
-	{ "tale", U"ᥐ" },
-	{ "latn", U"Ab" },
-	{ "zyyy", U"😀" },
-	{ "", U"" }
-};
-
 void FontDataPreview::set_data(const Ref<FontData> &p_data) {
 	Ref<Font> f = memnew(Font);
 	f->add_data(p_data);
 
 	line->clear();
-
-	String sample;
-	for (int i = 0; _samples[i].script != String(); i++) {
-		if (p_data->is_script_supported(_samples[i].script)) {
-			if (p_data->has_char(_samples[i].sample[0])) {
-				sample += _samples[i].sample;
+	if (p_data.is_valid()) {
+		String sample;
+		static const String sample_base = U"12漢字ԱբΑαАбΑαאבابܐܒހށआআਆઆଆஆఆಆആආกิກິༀကႠა한글ሀᎣᐁᚁᚠᜀᜠᝀᝠកᠠᤁᥐAb😀";
+		for (int i = 0; i < sample_base.length(); i++) {
+			if (p_data->has_char(sample_base[i])) {
+				sample += sample_base[i];
 			}
 		}
+		if (sample.is_empty()) {
+			sample = p_data->get_supported_chars().substr(0, 6);
+		}
+		line->add_string(sample, f, 72);
 	}
-	line->add_string(sample, f, 72);
 
 	update();
 }
 
 FontDataPreview::FontDataPreview() {
 	line.instantiate();
-}
-
-/*************************************************************************/
-
-void FontDataEditor::_notification(int p_what) {
-	if (p_what == NOTIFICATION_SORT_CHILDREN) {
-		int split_width = get_name_split_ratio() * get_size().width;
-		button->set_size(Size2(get_theme_icon("Add", "EditorIcons")->get_width(), get_size().height));
-		if (is_layout_rtl()) {
-			if (le != nullptr) {
-				fit_child_in_rect(le, Rect2(Vector2(split_width, 0), Size2(split_width, get_size().height)));
-			}
-			fit_child_in_rect(chk, Rect2(Vector2(split_width - chk->get_size().x, 0), Size2(chk->get_size().x, get_size().height)));
-			fit_child_in_rect(button, Rect2(Vector2(0, 0), Size2(button->get_size().width, get_size().height)));
-		} else {
-			if (le != nullptr) {
-				fit_child_in_rect(le, Rect2(Vector2(0, 0), Size2(split_width, get_size().height)));
-			}
-			fit_child_in_rect(chk, Rect2(Vector2(split_width, 0), Size2(chk->get_size().x, get_size().height)));
-			fit_child_in_rect(button, Rect2(Vector2(get_size().width - button->get_size().width, 0), Size2(button->get_size().width, get_size().height)));
-		}
-		update();
-	}
-	if (p_what == NOTIFICATION_DRAW) {
-		int split_width = get_name_split_ratio() * get_size().width;
-		Color dark_color = get_theme_color("dark_color_2", "Editor");
-		if (is_layout_rtl()) {
-			draw_rect(Rect2(Vector2(0, 0), Size2(split_width, get_size().height)), dark_color);
-		} else {
-			draw_rect(Rect2(Vector2(split_width, 0), Size2(split_width, get_size().height)), dark_color);
-		}
-	}
-	if (p_what == NOTIFICATION_THEME_CHANGED) {
-		if (le != nullptr) {
-			button->set_icon(get_theme_icon("Add", "EditorIcons"));
-		} else {
-			button->set_icon(get_theme_icon("Remove", "EditorIcons"));
-		}
-		queue_sort();
-	}
-	if (p_what == NOTIFICATION_RESIZED) {
-		queue_sort();
-	}
-}
-
-void FontDataEditor::update_property() {
-	if (le == nullptr) {
-		bool c = get_edited_object()->get(get_edited_property());
-		chk->set_pressed(c);
-		chk->set_disabled(is_read_only());
-	}
-}
-
-Size2 FontDataEditor::get_minimum_size() const {
-	return Size2(0, 60);
-}
-
-void FontDataEditor::_bind_methods() {
-}
-
-void FontDataEditor::init_lang_add() {
-	le = memnew(LineEdit);
-	le->set_placeholder("Language code");
-	le->set_custom_minimum_size(Size2(get_size().width / 2, 0));
-	le->set_editable(true);
-	add_child(le);
-
-	button->set_icon(get_theme_icon("Add", "EditorIcons"));
-	button->connect("pressed", callable_mp(this, &FontDataEditor::add_lang));
-}
-
-void FontDataEditor::init_lang_edit() {
-	button->set_icon(get_theme_icon("Remove", "EditorIcons"));
-	button->connect("pressed", callable_mp(this, &FontDataEditor::remove_lang));
-	chk->connect("toggled", callable_mp(this, &FontDataEditor::toggle_lang));
-}
-
-void FontDataEditor::init_script_add() {
-	le = memnew(LineEdit);
-	le->set_placeholder("Script code");
-	le->set_custom_minimum_size(Size2(get_size().width / 2, 0));
-	le->set_editable(true);
-	add_child(le);
-
-	button->set_icon(get_theme_icon("Add", "EditorIcons"));
-	button->connect("pressed", callable_mp(this, &FontDataEditor::add_script));
-}
-
-void FontDataEditor::init_script_edit() {
-	button->set_icon(get_theme_icon("Remove", "EditorIcons"));
-	button->connect("pressed", callable_mp(this, &FontDataEditor::remove_script));
-	chk->connect("toggled", callable_mp(this, &FontDataEditor::toggle_script));
-}
-
-void FontDataEditor::add_lang() {
-	FontData *fd = Object::cast_to<FontData>(get_edited_object());
-	if (fd != nullptr && !le->get_text().is_empty()) {
-		fd->set_language_support_override(le->get_text(), chk->is_pressed());
-		le->set_text("");
-		chk->set_pressed(false);
-	}
-}
-
-void FontDataEditor::add_script() {
-	FontData *fd = Object::cast_to<FontData>(get_edited_object());
-	if (fd != nullptr && le->get_text().length() == 4) {
-		fd->set_script_support_override(le->get_text(), chk->is_pressed());
-		le->set_text("");
-		chk->set_pressed(false);
-	}
-}
-
-void FontDataEditor::toggle_lang(bool p_pressed) {
-	FontData *fd = Object::cast_to<FontData>(get_edited_object());
-	if (fd != nullptr) {
-		String lang = String(get_edited_property()).replace("language_support_override/", "");
-		fd->set_language_support_override(lang, p_pressed);
-	}
-}
-
-void FontDataEditor::toggle_script(bool p_pressed) {
-	FontData *fd = Object::cast_to<FontData>(get_edited_object());
-	if (fd != nullptr) {
-		String script = String(get_edited_property()).replace("script_support_override/", "");
-		fd->set_script_support_override(script, p_pressed);
-	}
-}
-
-void FontDataEditor::remove_lang() {
-	FontData *fd = Object::cast_to<FontData>(get_edited_object());
-	if (fd != nullptr) {
-		String lang = String(get_edited_property()).replace("language_support_override/", "");
-		fd->remove_language_support_override(lang);
-	}
-}
-
-void FontDataEditor::remove_script() {
-	FontData *fd = Object::cast_to<FontData>(get_edited_object());
-	if (fd != nullptr) {
-		String script = String(get_edited_property()).replace("script_support_override/", "");
-		fd->remove_script_support_override(script);
-	}
-}
-
-FontDataEditor::FontDataEditor() {
-	chk = memnew(CheckBox);
-	chk->set_text(TTR("On"));
-	chk->set_flat(true);
-	add_child(chk);
-
-	button = memnew(Button);
-	button->set_flat(true);
-	add_child(button);
 }
 
 /*************************************************************************/
@@ -291,34 +92,6 @@ void EditorInspectorPluginFont::parse_begin(Object *p_object) {
 }
 
 bool EditorInspectorPluginFont::parse_property(Object *p_object, const Variant::Type p_type, const String &p_path, const PropertyHint p_hint, const String &p_hint_text, const uint32_t p_usage, const bool p_wide) {
-	if (p_path.begins_with("language_support_override/") && p_object->is_class("FontData")) {
-		String lang = p_path.replace("language_support_override/", "");
-
-		FontDataEditor *editor = memnew(FontDataEditor);
-		if (lang != "_new") {
-			editor->init_lang_edit();
-		} else {
-			editor->init_lang_add();
-		}
-		add_property_editor(p_path, editor);
-
-		return true;
-	}
-
-	if (p_path.begins_with("script_support_override/") && p_object->is_class("FontData")) {
-		String script = p_path.replace("script_support_override/", "");
-
-		FontDataEditor *editor = memnew(FontDataEditor);
-		if (script != "_new") {
-			editor->init_script_edit();
-		} else {
-			editor->init_script_add();
-		}
-		add_property_editor(p_path, editor);
-
-		return true;
-	}
-
 	return false;
 }
 

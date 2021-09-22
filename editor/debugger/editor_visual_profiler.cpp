@@ -123,11 +123,11 @@ String EditorVisualProfiler::_get_time_as_text(float p_time) {
 }
 
 Color EditorVisualProfiler::_get_color_from_signature(const StringName &p_signature) const {
-	Color bc = get_theme_color("error_color", "Editor");
+	Color bc = get_theme_color(SNAME("error_color"), SNAME("Editor"));
 	double rot = ABS(double(p_signature.hash()) / double(0x7FFFFFFF));
 	Color c;
 	c.set_hsv(rot, bc.get_s(), bc.get_v());
-	return c.lerp(get_theme_color("base_color", "Editor"), 0.07);
+	return c.lerp(get_theme_color(SNAME("base_color"), SNAME("Editor")), 0.07);
 }
 
 void EditorVisualProfiler::_item_selected() {
@@ -318,7 +318,7 @@ void EditorVisualProfiler::_update_plot() {
 void EditorVisualProfiler::_update_frame(bool p_focus_selected) {
 	int cursor_metric = _get_cursor_index();
 
-	Ref<Texture> track_icon = get_theme_icon("TrackColor", "EditorIcons");
+	Ref<Texture> track_icon = get_theme_icon(SNAME("TrackColor"), SNAME("EditorIcons"));
 
 	ERR_FAIL_INDEX(cursor_metric, frame_metrics.size());
 
@@ -365,13 +365,13 @@ void EditorVisualProfiler::_update_frame(bool p_focus_selected) {
 		}
 		TreeItem *category = variables->create_item(parent);
 
-		for (List<TreeItem *>::Element *E = stack.front(); E; E = E->next()) {
-			float total_cpu = E->get()->get_metadata(1);
-			float total_gpu = E->get()->get_metadata(2);
+		for (TreeItem *E : stack) {
+			float total_cpu = E->get_metadata(1);
+			float total_gpu = E->get_metadata(2);
 			total_cpu += cpu_time;
 			total_gpu += gpu_time;
-			E->get()->set_metadata(1, cpu_time);
-			E->get()->set_metadata(2, gpu_time);
+			E->set_metadata(1, cpu_time);
+			E->set_metadata(2, gpu_time);
 		}
 
 		category->set_icon(0, track_icon);
@@ -392,11 +392,11 @@ void EditorVisualProfiler::_update_frame(bool p_focus_selected) {
 		}
 	}
 
-	for (List<TreeItem *>::Element *E = categories.front(); E; E = E->next()) {
-		float total_cpu = E->get()->get_metadata(1);
-		float total_gpu = E->get()->get_metadata(2);
-		E->get()->set_text(1, _get_time_as_text(total_cpu));
-		E->get()->set_text(2, _get_time_as_text(total_gpu));
+	for (TreeItem *E : categories) {
+		float total_cpu = E->get_metadata(1);
+		float total_gpu = E->get_metadata(2);
+		E->set_text(1, _get_time_as_text(total_cpu));
+		E->set_text(2, _get_time_as_text(total_gpu));
 	}
 
 	if (ensure_selected) {
@@ -407,14 +407,14 @@ void EditorVisualProfiler::_update_frame(bool p_focus_selected) {
 
 void EditorVisualProfiler::_activate_pressed() {
 	if (activate->is_pressed()) {
-		activate->set_icon(get_theme_icon("Stop", "EditorIcons"));
+		activate->set_icon(get_theme_icon(SNAME("Stop"), SNAME("EditorIcons")));
 		activate->set_text(TTR("Stop"));
 		_clear_pressed(); //always clear on start
 	} else {
-		activate->set_icon(get_theme_icon("Play", "EditorIcons"));
+		activate->set_icon(get_theme_icon(SNAME("Play"), SNAME("EditorIcons")));
 		activate->set_text(TTR("Start"));
 	}
-	emit_signal("enable_profiling", activate->is_pressed());
+	emit_signal(SNAME("enable_profiling"), activate->is_pressed());
 }
 
 void EditorVisualProfiler::_clear_pressed() {
@@ -425,11 +425,11 @@ void EditorVisualProfiler::_clear_pressed() {
 void EditorVisualProfiler::_notification(int p_what) {
 	if (p_what == NOTIFICATION_ENTER_TREE || p_what == NOTIFICATION_LAYOUT_DIRECTION_CHANGED || p_what == NOTIFICATION_TRANSLATION_CHANGED) {
 		if (is_layout_rtl()) {
-			activate->set_icon(get_theme_icon("PlayBackwards", "EditorIcons"));
+			activate->set_icon(get_theme_icon(SNAME("PlayBackwards"), SNAME("EditorIcons")));
 		} else {
-			activate->set_icon(get_theme_icon("Play", "EditorIcons"));
+			activate->set_icon(get_theme_icon(SNAME("Play"), SNAME("EditorIcons")));
 		}
-		clear_button->set_icon(get_theme_icon("Clear", "EditorIcons"));
+		clear_button->set_icon(get_theme_icon(SNAME("Clear"), SNAME("EditorIcons")));
 	}
 }
 
@@ -437,8 +437,8 @@ void EditorVisualProfiler::_graph_tex_draw() {
 	if (last_metric < 0) {
 		return;
 	}
-	Ref<Font> font = get_theme_font("font", "Label");
-	int font_size = get_theme_font_size("font_size", "Label");
+	Ref<Font> font = get_theme_font(SNAME("font"), SNAME("Label"));
+	int font_size = get_theme_font_size(SNAME("font_size"), SNAME("Label"));
 	if (seeking) {
 		int max_frames = frame_metrics.size();
 		int frame = cursor_metric_edit->get_value() - (frame_metrics[last_metric].frame_number - max_frames + 1);

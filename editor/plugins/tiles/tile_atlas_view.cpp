@@ -32,6 +32,7 @@
 
 #include "core/input/input.h"
 #include "core/os/keyboard.h"
+#include "scene/2d/tile_map.h"
 #include "scene/gui/box_container.h"
 #include "scene/gui/label.h"
 #include "scene/gui/panel.h"
@@ -40,26 +41,32 @@
 #include "editor/editor_scale.h"
 #include "editor/editor_settings.h"
 
-void TileAtlasView::_gui_input(const Ref<InputEvent> &p_event) {
-	bool ctrl = Input::get_singleton()->is_key_pressed(KEY_CTRL);
-
+void TileAtlasView::gui_input(const Ref<InputEvent> &p_event) {
 	Ref<InputEventMouseButton> mb = p_event;
 	if (mb.is_valid()) {
 		drag_type = DRAG_TYPE_NONE;
-		if (ctrl && mb->is_pressed() && mb->get_button_index() == MOUSE_BUTTON_WHEEL_DOWN) {
-			// Zoom out
-			zoom_widget->set_zoom_by_increments(-2);
-			emit_signal("transform_changed", zoom_widget->get_zoom(), panning);
-			_update_zoom_and_panning(true);
-			accept_event();
-		}
 
-		if (ctrl && mb->is_pressed() && mb->get_button_index() == MOUSE_BUTTON_WHEEL_UP) {
-			// Zoom in
-			zoom_widget->set_zoom_by_increments(2);
-			emit_signal("transform_changed", zoom_widget->get_zoom(), panning);
-			_update_zoom_and_panning(true);
-			accept_event();
+		Vector2i scroll_vec = Vector2((mb->get_button_index() == MOUSE_BUTTON_WHEEL_LEFT) - (mb->get_button_index() == MOUSE_BUTTON_WHEEL_RIGHT), (mb->get_button_index() == MOUSE_BUTTON_WHEEL_UP) - (mb->get_button_index() == MOUSE_BUTTON_WHEEL_DOWN));
+		if (scroll_vec != Vector2()) {
+			if (mb->is_ctrl_pressed()) {
+				if (mb->is_shift_pressed()) {
+					panning.x += 32 * mb->get_factor() * scroll_vec.y;
+					panning.y += 32 * mb->get_factor() * scroll_vec.x;
+				} else {
+					panning.y += 32 * mb->get_factor() * scroll_vec.y;
+					panning.x += 32 * mb->get_factor() * scroll_vec.x;
+				}
+
+				emit_signal(SNAME("transform_changed"), zoom_widget->get_zoom(), panning);
+				_update_zoom_and_panning(true);
+				accept_event();
+
+			} else if (!mb->is_shift_pressed()) {
+				zoom_widget->set_zoom_by_increments(scroll_vec.y * 2);
+				emit_signal(SNAME("transform_changed"), zoom_widget->get_zoom(), panning);
+				_update_zoom_and_panning(true);
+				accept_event();
+			}
 		}
 
 		if (mb->get_button_index() == MOUSE_BUTTON_MIDDLE || mb->get_button_index() == MOUSE_BUTTON_RIGHT) {
@@ -77,7 +84,7 @@ void TileAtlasView::_gui_input(const Ref<InputEvent> &p_event) {
 		if (drag_type == DRAG_TYPE_PAN) {
 			panning += mm->get_relative();
 			_update_zoom_and_panning();
-			emit_signal("transform_changed", zoom_widget->get_zoom(), panning);
+			emit_signal(SNAME("transform_changed"), zoom_widget->get_zoom(), panning);
 			accept_event();
 		}
 	}
@@ -176,14 +183,14 @@ void TileAtlasView::_update_zoom_and_panning(bool p_zoom_on_mouse_pos) {
 
 void TileAtlasView::_zoom_widget_changed() {
 	_update_zoom_and_panning();
-	emit_signal("transform_changed", zoom_widget->get_zoom(), panning);
+	emit_signal(SNAME("transform_changed"), zoom_widget->get_zoom(), panning);
 }
 
 void TileAtlasView::_center_view() {
 	panning = Vector2();
 	button_center_view->set_disabled(true);
 	_update_zoom_and_panning();
-	emit_signal("transform_changed", zoom_widget->get_zoom(), panning);
+	emit_signal(SNAME("transform_changed"), zoom_widget->get_zoom(), panning);
 }
 
 void TileAtlasView::_base_tiles_root_control_gui_input(const Ref<InputEvent> &p_event) {
@@ -253,7 +260,7 @@ void TileAtlasView::_draw_base_tiles() {
 			Vector2i offset_pos = (margins + (atlas_coords * texture_region_size) + tile_set_atlas_source->get_tile_texture_region(atlas_coords).size / 2 + tile_set_atlas_source->get_tile_effective_texture_offset(atlas_coords, 0));
 
 			// Draw the tile.
-			TileSetPluginAtlasRendering::draw_tile(base_tiles_draw->get_canvas_item(), offset_pos, tile_set, source_id, atlas_coords, 0);
+			TileMap::draw_tile(base_tiles_draw->get_canvas_item(), offset_pos, tile_set, source_id, atlas_coords, 0);
 		}
 	}
 }
@@ -320,10 +327,12 @@ void TileAtlasView::_draw_base_tiles_shape_grid() {
 		Vector2i tile_id = tile_set_atlas_source->get_tile_id(i);
 		Vector2 in_tile_base_offset = tile_set_atlas_source->get_tile_effective_texture_offset(tile_id, 0);
 		Rect2i texture_region = tile_set_atlas_source->get_tile_texture_region(tile_id);
-		Vector2 origin = texture_region.position + (texture_region.size - tile_shape_size) / 2 + in_tile_base_offset;
 
 		// Draw only if the tile shape fits in the texture region
-		tile_set->draw_tile_shape(base_tiles_shape_grid, Rect2(origin, tile_shape_size), grid_color);
+		Transform2D tile_xform;
+		tile_xform.set_origin(texture_region.get_center() + in_tile_base_offset);
+		tile_xform.set_scale(tile_shape_size);
+		tile_set->draw_tile_shape(base_tiles_shape_grid, tile_xform, grid_color);
 	}
 }
 
@@ -369,7 +378,7 @@ void TileAtlasView::_draw_alternatives() {
 				}
 
 				// Draw the tile.
-				TileSetPluginAtlasRendering::draw_tile(alternatives_draw->get_canvas_item(), offset_pos, tile_set, source_id, atlas_coords, alternative_id);
+				TileMap::draw_tile(alternatives_draw->get_canvas_item(), offset_pos, tile_set, source_id, atlas_coords, alternative_id);
 
 				// Increment the x position.
 				current_pos.x += transposed ? texture_region.size.y : texture_region.size.x;
@@ -382,13 +391,13 @@ void TileAtlasView::_draw_alternatives() {
 }
 
 void TileAtlasView::_draw_background_left() {
-	Ref<Texture2D> texture = get_theme_icon("Checkerboard", "EditorIcons");
+	Ref<Texture2D> texture = get_theme_icon(SNAME("Checkerboard"), SNAME("EditorIcons"));
 	background_left->set_size(base_tiles_root_control->get_custom_minimum_size());
 	background_left->draw_texture_rect(texture, Rect2(Vector2(), background_left->get_size()), true);
 }
 
 void TileAtlasView::_draw_background_right() {
-	Ref<Texture2D> texture = get_theme_icon("Checkerboard", "EditorIcons");
+	Ref<Texture2D> texture = get_theme_icon(SNAME("Checkerboard"), SNAME("EditorIcons"));
 	background_right->set_size(alternative_tiles_root_control->get_custom_minimum_size());
 	background_right->draw_texture_rect(texture, Rect2(Vector2(), background_right->get_size()), true);
 }
@@ -535,14 +544,12 @@ void TileAtlasView::update() {
 void TileAtlasView::_notification(int p_what) {
 	switch (p_what) {
 		case NOTIFICATION_READY:
-			button_center_view->set_icon(get_theme_icon("CenterView", "EditorIcons"));
+			button_center_view->set_icon(get_theme_icon(SNAME("CenterView"), SNAME("EditorIcons")));
 			break;
 	}
 }
 
 void TileAtlasView::_bind_methods() {
-	ClassDB::bind_method("_gui_input", &TileAtlasView::_gui_input);
-
 	ADD_SIGNAL(MethodInfo("transform_changed", PropertyInfo(Variant::FLOAT, "zoom"), PropertyInfo(Variant::VECTOR2, "scroll")));
 }
 
@@ -564,17 +571,18 @@ TileAtlasView::TileAtlasView() {
 	zoom_widget->connect("zoom_changed", callable_mp(this, &TileAtlasView::_zoom_widget_changed).unbind(1));
 
 	button_center_view = memnew(Button);
-	button_center_view->set_icon(get_theme_icon("CenterView", "EditorIcons"));
+	button_center_view->set_icon(get_theme_icon(SNAME("CenterView"), SNAME("EditorIcons")));
 	button_center_view->set_anchors_and_offsets_preset(Control::PRESET_TOP_RIGHT, Control::PRESET_MODE_MINSIZE, 5);
 	button_center_view->connect("pressed", callable_mp(this, &TileAtlasView::_center_view));
 	button_center_view->set_flat(true);
 	button_center_view->set_disabled(true);
+	button_center_view->set_tooltip(TTR("Center View"));
 	add_child(button_center_view);
 
 	center_container = memnew(CenterContainer);
 	center_container->set_mouse_filter(Control::MOUSE_FILTER_IGNORE);
 	center_container->set_anchors_preset(Control::PRESET_CENTER);
-	center_container->connect("gui_input", callable_mp(this, &TileAtlasView::_gui_input));
+	center_container->connect("gui_input", callable_mp(this, &TileAtlasView::gui_input));
 	panel->add_child(center_container);
 
 	missing_source_label = memnew(Label);

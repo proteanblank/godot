@@ -47,7 +47,7 @@ class TileAtlasView : public Control {
 private:
 	TileSet *tile_set;
 	TileSetAtlasSource *tile_set_atlas_source;
-	int source_id = -1;
+	int source_id = TileSet::INVALID_SOURCE;
 
 	enum DragType {
 		DRAG_TYPE_NONE,
@@ -62,7 +62,7 @@ private:
 	void _update_zoom_and_panning(bool p_zoom_on_mouse_pos = false);
 	void _zoom_widget_changed();
 	void _center_view();
-	void _gui_input(const Ref<InputEvent> &p_event);
+	virtual void gui_input(const Ref<InputEvent> &p_event) override;
 
 	Map<Vector2, Map<int, Rect2i>> alternative_tiles_rect_cache;
 	void _update_alternative_tiles_rect_cache();

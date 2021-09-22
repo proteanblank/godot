@@ -41,18 +41,18 @@ protected:
 	struct Contact {
 		Vector3 position;
 		Vector3 normal;
-		int index_A, index_B;
+		int index_A = 0, index_B = 0;
 		Vector3 local_A, local_B;
-		real_t acc_normal_impulse; // accumulated normal impulse (Pn)
+		real_t acc_normal_impulse = 0.0; // accumulated normal impulse (Pn)
 		Vector3 acc_tangent_impulse; // accumulated tangent impulse (Pt)
-		real_t acc_bias_impulse; // accumulated normal impulse for position bias (Pnb)
-		real_t acc_bias_impulse_center_of_mass; // accumulated normal impulse for position bias applied to com
-		real_t mass_normal;
-		real_t bias;
-		real_t bounce;
+		real_t acc_bias_impulse = 0.0; // accumulated normal impulse for position bias (Pnb)
+		real_t acc_bias_impulse_center_of_mass = 0.0; // accumulated normal impulse for position bias applied to com
+		real_t mass_normal = 0.0;
+		real_t bias = 0.0;
+		real_t bounce = 0.0;
 
-		real_t depth;
-		bool active;
+		real_t depth = 0.0;
+		bool active = false;
 		Vector3 rA, rB; // Offset in world orientation with respect to center of mass
 	};
 
@@ -83,8 +83,8 @@ class BodyPair3DSW : public BodyContact3DSW {
 	int shape_A = 0;
 	int shape_B = 0;
 
-	bool dynamic_A = false;
-	bool dynamic_B = false;
+	bool collide_A = false;
+	bool collide_B = false;
 
 	bool report_contacts_only = false;
 
@@ -115,7 +115,10 @@ class BodySoftBodyPair3DSW : public BodyContact3DSW {
 
 	int body_shape = 0;
 
-	bool body_dynamic = false;
+	bool body_collides = false;
+	bool soft_body_collides = false;
+
+	bool report_contacts_only = false;
 
 	LocalVector<Contact> contacts;
 

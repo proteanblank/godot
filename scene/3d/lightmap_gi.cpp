@@ -31,14 +31,9 @@
 #include "lightmap_gi.h"
 
 #include "core/io/config_file.h"
-#include "core/io/dir_access.h"
-#include "core/io/file_access.h"
-#include "core/io/resource_saver.h"
-#include "core/math/camera_matrix.h"
 #include "core/math/delaunay_3d.h"
-#include "core/os/os.h"
-#include "core/templates/sort_array.h"
 #include "lightmap_probe.h"
+#include "scene/3d/mesh_instance_3d.h"
 
 void LightmapGIData::add_user(const NodePath &p_path, const Rect2 &p_uv_scale, int p_slice_index, int32_t p_sub_instance) {
 	User user;
@@ -472,7 +467,7 @@ int32_t LightmapGI::_compute_bsp_tree(const Vector<Vector3> &p_points, const Loc
 				}
 			}
 			if (i == 0) {
-				centers.push_back(bounds.position + bounds.size * 0.5);
+				centers.push_back(bounds.get_center());
 			} else {
 				bounds_all.merge_with(bounds);
 			}
@@ -560,7 +555,7 @@ void LightmapGI::_plot_triangle_into_octree(GenProbesOctree *p_cell, float p_cel
 		subcell.position = Vector3(pos) * p_cell_size;
 		subcell.size = Vector3(half_size, half_size, half_size) * p_cell_size;
 
-		if (!Geometry3D::triangle_box_overlap(subcell.position + subcell.size * 0.5, subcell.size * 0.5, p_triangle)) {
+		if (!Geometry3D::triangle_box_overlap(subcell.get_center(), subcell.size * 0.5, p_triangle)) {
 			continue;
 		}
 
@@ -599,7 +594,7 @@ void LightmapGI::_gen_new_positions_from_octree(const GenProbesOctree *p_cell, f
 			const Vector3 *pp = probe_positions.ptr();
 			bool exists = false;
 			for (int j = 0; j < ppcount; j++) {
-				if (pp[j].distance_to(real_pos) < CMP_EPSILON) {
+				if (pp[j].is_equal_approx(real_pos)) {
 					exists = true;
 					break;
 				}
@@ -1250,7 +1245,7 @@ void LightmapGI::set_light_data(const Ref<LightmapGIData> &p_data) {
 		}
 	}
 
-	update_gizmo();
+	update_gizmos();
 }
 
 Ref<LightmapGIData> LightmapGI::get_light_data() const {

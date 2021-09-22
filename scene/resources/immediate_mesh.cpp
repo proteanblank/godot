@@ -146,7 +146,7 @@ void ImmediateMesh::surface_add_vertex_2d(const Vector2 &p_vertex) {
 }
 void ImmediateMesh::surface_end() {
 	ERR_FAIL_COND_MSG(!surface_active, "Not creating any surface. Use surface_begin() to do it.");
-	ERR_FAIL_COND_MSG(!vertices.size(), "No vertices were added, surface cant be created.");
+	ERR_FAIL_COND_MSG(!vertices.size(), "No vertices were added, surface can't be created.");
 
 	uint32_t format = ARRAY_FORMAT_VERTEX;
 
@@ -334,9 +334,6 @@ int ImmediateMesh::surface_get_array_len(int p_idx) const {
 }
 int ImmediateMesh::surface_get_array_index_len(int p_idx) const {
 	return 0;
-}
-bool ImmediateMesh::surface_is_softbody_friendly(int p_idx) const {
-	return false;
 }
 Array ImmediateMesh::surface_get_arrays(int p_surface) const {
 	ERR_FAIL_INDEX_V(p_surface, int(surfaces.size()), Array());

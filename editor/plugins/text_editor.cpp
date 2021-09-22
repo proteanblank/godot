@@ -100,7 +100,7 @@ void TextEditor::set_edited_resource(const RES &p_res) {
 	code_editor->get_text_editor()->clear_undo_history();
 	code_editor->get_text_editor()->tag_saved_version();
 
-	emit_signal("name_changed");
+	emit_signal(SNAME("name_changed"));
 	code_editor->update_line_and_column();
 }
 
@@ -132,14 +132,14 @@ void TextEditor::reload_text() {
 	ERR_FAIL_COND(text_file.is_null());
 
 	CodeEdit *te = code_editor->get_text_editor();
-	int column = te->cursor_get_column();
-	int row = te->cursor_get_line();
+	int column = te->get_caret_column();
+	int row = te->get_caret_line();
 	int h = te->get_h_scroll();
 	int v = te->get_v_scroll();
 
 	te->set_text(text_file->get_text());
-	te->cursor_set_line(row);
-	te->cursor_set_column(column);
+	te->set_caret_line(row);
+	te->set_caret_column(column);
 	te->set_h_scroll(h);
 	te->set_v_scroll(v);
 
@@ -149,8 +149,8 @@ void TextEditor::reload_text() {
 }
 
 void TextEditor::_validate_script() {
-	emit_signal("name_changed");
-	emit_signal("edited_script_changed");
+	emit_signal(SNAME("name_changed"));
+	emit_signal(SNAME("edited_script_changed"));
 }
 
 void TextEditor::_update_bookmark_list() {
@@ -291,27 +291,27 @@ void TextEditor::_edit_option(int p_op) {
 	switch (p_op) {
 		case EDIT_UNDO: {
 			tx->undo();
-			tx->call_deferred("grab_focus");
+			tx->call_deferred(SNAME("grab_focus"));
 		} break;
 		case EDIT_REDO: {
 			tx->redo();
-			tx->call_deferred("grab_focus");
+			tx->call_deferred(SNAME("grab_focus"));
 		} break;
 		case EDIT_CUT: {
 			tx->cut();
-			tx->call_deferred("grab_focus");
+			tx->call_deferred(SNAME("grab_focus"));
 		} break;
 		case EDIT_COPY: {
 			tx->copy();
-			tx->call_deferred("grab_focus");
+			tx->call_deferred(SNAME("grab_focus"));
 		} break;
 		case EDIT_PASTE: {
 			tx->paste();
-			tx->call_deferred("grab_focus");
+			tx->call_deferred(SNAME("grab_focus"));
 		} break;
 		case EDIT_SELECT_ALL: {
 			tx->select_all();
-			tx->call_deferred("grab_focus");
+			tx->call_deferred(SNAME("grab_focus"));
 		} break;
 		case EDIT_MOVE_LINE_UP: {
 			code_editor->move_lines_up();
@@ -332,7 +332,7 @@ void TextEditor::_edit_option(int p_op) {
 			code_editor->duplicate_selection();
 		} break;
 		case EDIT_TOGGLE_FOLD_LINE: {
-			tx->toggle_foldable_line(tx->cursor_get_line());
+			tx->toggle_foldable_line(tx->get_caret_line());
 			tx->update();
 		} break;
 		case EDIT_FOLD_ALL_LINES: {
@@ -340,7 +340,7 @@ void TextEditor::_edit_option(int p_op) {
 			tx->update();
 		} break;
 		case EDIT_UNFOLD_ALL_LINES: {
-			tx->unhide_all_lines();
+			tx->unfold_all_lines();
 			tx->update();
 		} break;
 		case EDIT_TRIM_TRAILING_WHITESAPCE: {
@@ -374,16 +374,16 @@ void TextEditor::_edit_option(int p_op) {
 			code_editor->get_find_replace_bar()->popup_replace();
 		} break;
 		case SEARCH_IN_FILES: {
-			String selected_text = code_editor->get_text_editor()->get_selection_text();
+			String selected_text = code_editor->get_text_editor()->get_selected_text();
 
 			// Yep, because it doesn't make sense to instance this dialog for every single script open...
 			// So this will be delegated to the ScriptEditor.
-			emit_signal("search_in_files_requested", selected_text);
+			emit_signal(SNAME("search_in_files_requested"), selected_text);
 		} break;
 		case REPLACE_IN_FILES: {
-			String selected_text = code_editor->get_text_editor()->get_selection_text();
+			String selected_text = code_editor->get_text_editor()->get_selected_text();
 
-			emit_signal("replace_in_files_requested", selected_text);
+			emit_signal(SNAME("replace_in_files_requested"), selected_text);
 		} break;
 		case SEARCH_GOTO_LINE: {
 			goto_line_dialog->popup_find_line(tx);
@@ -427,16 +427,18 @@ void TextEditor::_text_edit_gui_input(const Ref<InputEvent> &ev) {
 
 	if (mb.is_valid()) {
 		if (mb->get_button_index() == MOUSE_BUTTON_RIGHT) {
-			int col, row;
 			CodeEdit *tx = code_editor->get_text_editor();
-			tx->_get_mouse_pos(mb->get_global_position() - tx->get_global_position(), row, col);
 
-			tx->set_right_click_moves_caret(EditorSettings::get_singleton()->get("text_editor/cursor/right_click_moves_caret"));
+			Point2i pos = tx->get_line_column_at_pos(mb->get_global_position() - tx->get_global_position());
+			int row = pos.y;
+			int col = pos.x;
+
+			tx->set_move_caret_on_right_click_enabled(EditorSettings::get_singleton()->get("text_editor/behavior/navigation/move_caret_on_right_click"));
 			bool can_fold = tx->can_fold_line(row);
 			bool is_folded = tx->is_line_folded(row);
 
-			if (tx->is_right_click_moving_caret()) {
-				if (tx->is_selection_active()) {
+			if (tx->is_move_caret_on_right_click_enabled()) {
+				if (tx->has_selection()) {
 					int from_line = tx->get_selection_from_line();
 					int to_line = tx->get_selection_to_line();
 					int from_column = tx->get_selection_from_column();
@@ -447,25 +449,33 @@ void TextEditor::_text_edit_gui_input(const Ref<InputEvent> &ev) {
 						tx->deselect();
 					}
 				}
-				if (!tx->is_selection_active()) {
-					tx->cursor_set_line(row, true, false);
-					tx->cursor_set_column(col);
+				if (!tx->has_selection()) {
+					tx->set_caret_line(row, true, false);
+					tx->set_caret_column(col);
 				}
 			}
 
 			if (!mb->is_pressed()) {
-				_make_context_menu(tx->is_selection_active(), can_fold, is_folded, get_local_mouse_position());
+				_make_context_menu(tx->has_selection(), can_fold, is_folded, get_local_mouse_position());
 			}
 		}
 	}
 
 	Ref<InputEventKey> k = ev;
-	if (k.is_valid() && k->is_pressed() && k->get_keycode() == KEY_MENU) {
+	if (k.is_valid() && k->is_pressed() && k->is_action("ui_menu", true)) {
 		CodeEdit *tx = code_editor->get_text_editor();
-		int line = tx->cursor_get_line();
-		_make_context_menu(tx->is_selection_active(), tx->can_fold_line(line), tx->is_line_folded(line), (get_global_transform().inverse() * tx->get_global_transform()).xform(tx->_get_cursor_pixel_pos()));
+		int line = tx->get_caret_line();
+		tx->adjust_viewport_to_caret();
+		_make_context_menu(tx->has_selection(), tx->can_fold_line(line), tx->is_line_folded(line), (get_global_transform().inverse() * tx->get_global_transform()).xform(tx->get_caret_draw_pos()));
 		context_menu->grab_focus();
 	}
+}
+
+void TextEditor::_prepare_edit_menu() {
+	const CodeEdit *tx = code_editor->get_text_editor();
+	PopupMenu *popup = edit_menu->get_popup();
+	popup->set_item_disabled(popup->get_item_index(EDIT_UNDO), !tx->has_undo());
+	popup->set_item_disabled(popup->get_item_index(EDIT_REDO), !tx->has_redo());
 }
 
 void TextEditor::_make_context_menu(bool p_selection, bool p_can_fold, bool p_is_folded, Vector2 p_position) {
@@ -494,9 +504,17 @@ void TextEditor::_make_context_menu(bool p_selection, bool p_can_fold, bool p_is
 		context_menu->add_shortcut(ED_GET_SHORTCUT("script_text_editor/toggle_fold_line"), EDIT_TOGGLE_FOLD_LINE);
 	}
 
+	const CodeEdit *tx = code_editor->get_text_editor();
+	context_menu->set_item_disabled(context_menu->get_item_index(EDIT_UNDO), !tx->has_undo());
+	context_menu->set_item_disabled(context_menu->get_item_index(EDIT_REDO), !tx->has_redo());
+
 	context_menu->set_position(get_global_transform().xform(p_position));
 	context_menu->set_size(Vector2(1, 1));
 	context_menu->popup();
+}
+
+void TextEditor::update_toggle_scripts_button() {
+	code_editor->update_toggle_scripts_button();
 }
 
 TextEditor::TextEditor() {
@@ -507,6 +525,7 @@ TextEditor::TextEditor() {
 	code_editor->connect("validate_script", callable_mp(this, &TextEditor::_validate_script));
 	code_editor->set_anchors_and_offsets_preset(Control::PRESET_WIDE);
 	code_editor->set_v_size_flags(Control::SIZE_EXPAND_FILL);
+	code_editor->show_toggle_scripts_button();
 
 	update_settings();
 
@@ -539,6 +558,7 @@ TextEditor::TextEditor() {
 	edit_hb->add_child(edit_menu);
 	edit_menu->set_text(TTR("Edit"));
 	edit_menu->set_switch_on_hover(true);
+	edit_menu->connect("about_to_popup", callable_mp(this, &TextEditor::_prepare_edit_menu));
 	edit_menu->get_popup()->connect("id_pressed", callable_mp(this, &TextEditor::_edit_option));
 
 	edit_menu->get_popup()->add_shortcut(ED_GET_SHORTCUT("ui_undo"), EDIT_UNDO);

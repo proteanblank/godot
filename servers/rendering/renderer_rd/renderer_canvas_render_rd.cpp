@@ -480,6 +480,10 @@ void RendererCanvasRenderRD::_render_item(RD::DrawListID p_draw_list, RID p_rend
 			case Item::Command::TYPE_RECT: {
 				const Item::CommandRect *rect = static_cast<const Item::CommandRect *>(c);
 
+				if (rect->flags & CANVAS_RECT_TILE) {
+					current_repeat = RenderingServer::CanvasItemTextureRepeat::CANVAS_ITEM_TEXTURE_REPEAT_ENABLED;
+				}
+
 				//bind pipeline
 				{
 					RID pipeline = pipeline_variants->variants[light_mode][PIPELINE_VARIANT_QUAD].get_render_pipeline(RD::INVALID_ID, p_framebuffer_format);
@@ -535,6 +539,14 @@ void RendererCanvasRenderRD::_render_item(RD::DrawListID p_draw_list, RID p_rend
 					}
 
 					src_rect = Rect2(0, 0, 1, 1);
+				}
+
+				if (rect->flags & CANVAS_RECT_MSDF) {
+					push_constant.flags |= FLAGS_USE_MSDF;
+					push_constant.msdf[0] = rect->px_range; // Pixel range.
+					push_constant.msdf[1] = rect->outline; // Outline size.
+					push_constant.msdf[2] = 0.f; // Reserved.
+					push_constant.msdf[3] = 0.f; // Reserved.
 				}
 
 				push_constant.modulation[0] = rect->modulate.r * base_color.r;
@@ -620,7 +632,7 @@ void RendererCanvasRenderRD::_render_item(RD::DrawListID p_draw_list, RID p_rend
 				RD::get_singleton()->draw_list_bind_index_array(p_draw_list, shader.quad_index_array);
 				RD::get_singleton()->draw_list_draw(p_draw_list, true);
 
-				//restore if overrided
+				// Restore if overridden.
 				push_constant.color_texture_pixel_size[0] = texpixel_size.x;
 				push_constant.color_texture_pixel_size[1] = texpixel_size.y;
 
@@ -1074,7 +1086,7 @@ void RendererCanvasRenderRD::_render_items(RID p_to_render_target, int p_item_co
 			}
 		}
 
-		RID material = ci->material;
+		RID material = ci->material_owner == nullptr ? ci->material : ci->material_owner->material;
 
 		if (material.is_null() && ci->canvas_group != nullptr) {
 			material = default_canvas_group_material;
@@ -1089,7 +1101,8 @@ void RendererCanvasRenderRD::_render_items(RID p_to_render_target, int p_item_co
 			if (material_data) {
 				if (material_data->shader_data->version.is_valid() && material_data->shader_data->valid) {
 					pipeline_variants = &material_data->shader_data->pipeline_variants;
-					if (material_data->uniform_set.is_valid()) {
+					// Update uniform set.
+					if (material_data->uniform_set.is_valid() && RD::get_singleton()->uniform_set_is_valid(material_data->uniform_set)) { // Material may not have a uniform set.
 						RD::get_singleton()->draw_list_bind_uniform_set(draw_list, material_data->uniform_set, MATERIAL_UNIFORM_SET);
 					}
 				} else {
@@ -1341,8 +1354,10 @@ void RendererCanvasRenderRD::canvas_render_items(RID p_to_render_target, Item *p
 			}
 		}
 
-		if (ci->material.is_valid()) {
-			MaterialData *md = (MaterialData *)storage->material_get_data(ci->material, RendererStorageRD::SHADER_TYPE_2D);
+		RID material = ci->material_owner == nullptr ? ci->material : ci->material_owner->material;
+
+		if (material.is_valid()) {
+			MaterialData *md = (MaterialData *)storage->material_get_data(material, RendererStorageRD::SHADER_TYPE_2D);
 			if (md && md->shader_data->valid) {
 				if (md->shader_data->uses_screen_texture && canvas_group_owner == nullptr) {
 					if (!material_screen_texture_found) {
@@ -1362,7 +1377,7 @@ void RendererCanvasRenderRD::canvas_render_items(RID p_to_render_target, Item *p
 					if (!RD::get_singleton()->uniform_set_is_valid(md->uniform_set)) {
 						// uniform set may be gone because a dependency was erased. In this case, it will happen
 						// if a texture is deleted, so just re-create it.
-						storage->material_force_update_textures(ci->material, RendererStorageRD::SHADER_TYPE_2D);
+						storage->material_force_update_textures(material, RendererStorageRD::SHADER_TYPE_2D);
 					}
 				}
 			}
@@ -1606,7 +1621,7 @@ void RendererCanvasRenderRD::light_update_directional_shadow(RID p_rid, int p_sh
 
 	Vector2 light_dir = p_light_xform.elements[1].normalized();
 
-	Vector2 center = p_clip_rect.position + p_clip_rect.size * 0.5;
+	Vector2 center = p_clip_rect.get_center();
 
 	float to_edge_distance = ABS(light_dir.dot(p_clip_rect.get_support(light_dir)) - light_dir.dot(center));
 
@@ -1965,8 +1980,7 @@ void RendererCanvasRenderRD::ShaderData::set_code(const String &p_code) {
 	RendererCanvasRenderRD *canvas_singleton = (RendererCanvasRenderRD *)RendererCanvasRender::singleton;
 
 	Error err = canvas_singleton->shader.compiler.compile(RS::SHADER_CANVAS_ITEM, code, &actions, path, gen_code);
-
-	ERR_FAIL_COND(err != OK);
+	ERR_FAIL_COND_MSG(err != OK, "Shader compilation failed.");
 
 	if (version.is_null()) {
 		version = canvas_singleton->shader.canvas_shader.version_create();
@@ -2570,8 +2584,21 @@ RendererCanvasRenderRD::RendererCanvasRenderRD(RendererStorageRD *p_storage) {
 		default_canvas_group_shader = storage->shader_allocate();
 		storage->shader_initialize(default_canvas_group_shader);
 
-		storage->shader_set_code(default_canvas_group_shader, "shader_type canvas_item; \nvoid fragment() {\n\tvec4 c = textureLod(SCREEN_TEXTURE,SCREEN_UV,0.0); if (c.a > 0.0001) c.rgb/=c.a; COLOR *= c; \n}\n");
+		storage->shader_set_code(default_canvas_group_shader, R"(
+// Default CanvasGroup shader.
 
+shader_type canvas_item;
+
+void fragment() {
+	vec4 c = textureLod(SCREEN_TEXTURE, SCREEN_UV, 0.0);
+
+	if (c.a > 0.0001) {
+		c.rgb /= c.a;
+	}
+
+	COLOR *= c;
+}
+)");
 		default_canvas_group_material = storage->material_allocate();
 		storage->material_initialize(default_canvas_group_material);
 

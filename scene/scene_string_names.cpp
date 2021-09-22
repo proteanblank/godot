@@ -63,9 +63,12 @@ SceneStringNames::SceneStringNames() {
 	animation_started = StaticCString::create("animation_started");
 
 	pose_updated = StaticCString::create("pose_updated");
+	bone_pose_changed = StaticCString::create("bone_pose_changed");
 
 	mouse_entered = StaticCString::create("mouse_entered");
 	mouse_exited = StaticCString::create("mouse_exited");
+	mouse_shape_entered = StaticCString::create("mouse_shape_entered");
+	mouse_shape_exited = StaticCString::create("mouse_shape_exited");
 
 	focus_entered = StaticCString::create("focus_entered");
 	focus_exited = StaticCString::create("focus_exited");
@@ -87,9 +90,6 @@ SceneStringNames::SceneStringNames() {
 	iteration = StaticCString::create("iteration");
 	update = StaticCString::create("update");
 	updated = StaticCString::create("updated");
-
-	_get_gizmo_geometry = StaticCString::create("_get_gizmo_geometry");
-	_can_gizmo_scale = StaticCString::create("_can_gizmo_scale");
 
 	_physics_process = StaticCString::create("_physics_process");
 	_process = StaticCString::create("_process");
@@ -134,6 +134,7 @@ SceneStringNames::SceneStringNames() {
 
 	_spatial_editor_group = StaticCString::create("_spatial_editor_group");
 	_request_gizmo = StaticCString::create("_request_gizmo");
+	_clear_subgizmo_selection = StaticCString::create("_clear_subgizmo_selection");
 
 	offset = StaticCString::create("offset");
 	unit_offset = StaticCString::create("unit_offset");
@@ -169,6 +170,8 @@ SceneStringNames::SceneStringNames() {
 
 	_mouse_enter = StaticCString::create("_mouse_enter");
 	_mouse_exit = StaticCString::create("_mouse_exit");
+	_mouse_shape_enter = StaticCString::create("_mouse_shape_enter");
+	_mouse_shape_exit = StaticCString::create("_mouse_shape_exit");
 
 	_pressed = StaticCString::create("_pressed");
 	_toggled = StaticCString::create("_toggled");

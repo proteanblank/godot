@@ -155,7 +155,7 @@ void GDScriptByteCodeGenerator::end_parameters() {
 	function->default_arguments.reverse();
 }
 
-void GDScriptByteCodeGenerator::write_start(GDScript *p_script, const StringName &p_function_name, bool p_static, MultiplayerAPI::RPCMode p_rpc_mode, const GDScriptDataType &p_return_type) {
+void GDScriptByteCodeGenerator::write_start(GDScript *p_script, const StringName &p_function_name, bool p_static, Multiplayer::RPCConfig p_rpc_config, const GDScriptDataType &p_return_type) {
 	function = memnew(GDScriptFunction);
 	debug_stack = EngineDebugger::is_active();
 
@@ -170,7 +170,7 @@ void GDScriptByteCodeGenerator::write_start(GDScript *p_script, const StringName
 
 	function->_static = p_static;
 	function->return_type = p_return_type;
-	function->rpc_mode = p_rpc_mode;
+	function->rpc_config = p_rpc_config;
 	function->_argument_count = 0;
 }
 
@@ -864,6 +864,12 @@ void GDScriptByteCodeGenerator::write_assign_default_parameter(const Address &p_
 	function->default_arguments.push_back(opcodes.size());
 }
 
+void GDScriptByteCodeGenerator::write_store_global(const Address &p_dst, int p_global_index) {
+	append(GDScriptFunction::OPCODE_STORE_GLOBAL, 1);
+	append(p_dst);
+	append(p_global_index);
+}
+
 void GDScriptByteCodeGenerator::write_store_named_global(const Address &p_dst, const StringName &p_global) {
 	append(GDScriptFunction::OPCODE_STORE_NAMED_GLOBAL, 1);
 	append(p_dst);
@@ -1459,8 +1465,8 @@ void GDScriptByteCodeGenerator::write_endfor() {
 	}
 
 	// Patch break statements.
-	for (const List<int>::Element *E = current_breaks_to_patch.back()->get().front(); E; E = E->next()) {
-		patch_jump(E->get());
+	for (const int &E : current_breaks_to_patch.back()->get()) {
+		patch_jump(E);
 	}
 	current_breaks_to_patch.pop_back();
 
@@ -1494,8 +1500,8 @@ void GDScriptByteCodeGenerator::write_endwhile() {
 	while_jmp_addrs.pop_back();
 
 	// Patch break statements.
-	for (const List<int>::Element *E = current_breaks_to_patch.back()->get().front(); E; E = E->next()) {
-		patch_jump(E->get());
+	for (const int &E : current_breaks_to_patch.back()->get()) {
+		patch_jump(E);
 	}
 	current_breaks_to_patch.pop_back();
 }
@@ -1506,8 +1512,8 @@ void GDScriptByteCodeGenerator::start_match() {
 
 void GDScriptByteCodeGenerator::start_match_branch() {
 	// Patch continue statements.
-	for (const List<int>::Element *E = match_continues_to_patch.back()->get().front(); E; E = E->next()) {
-		patch_jump(E->get());
+	for (const int &E : match_continues_to_patch.back()->get()) {
+		patch_jump(E);
 	}
 	match_continues_to_patch.pop_back();
 	// Start a new list for next branch.
@@ -1516,8 +1522,8 @@ void GDScriptByteCodeGenerator::start_match_branch() {
 
 void GDScriptByteCodeGenerator::end_match() {
 	// Patch continue statements.
-	for (const List<int>::Element *E = match_continues_to_patch.back()->get().front(); E; E = E->next()) {
-		patch_jump(E->get());
+	for (const int &E : match_continues_to_patch.back()->get()) {
+		patch_jump(E);
 	}
 	match_continues_to_patch.pop_back();
 }

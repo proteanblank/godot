@@ -32,6 +32,7 @@
 #define COLLISION_OBJECT_2D_H
 
 #include "scene/2d/node_2d.h"
+#include "scene/main/viewport.h"
 #include "scene/resources/shape_2d.h"
 #include "servers/physics_server_2d.h"
 
@@ -75,7 +76,7 @@ private:
 	int total_subshapes = 0;
 
 	Map<uint32_t, ShapeData> shapes;
-	bool only_update_transform_changes = false; //this is used for sync physics in CharacterBody2D
+	bool only_update_transform_changes = false; // This is used for sync to physics.
 
 	void _apply_disabled();
 	void _apply_enabled();
@@ -88,15 +89,19 @@ protected:
 
 	void _update_pickable();
 	friend class Viewport;
-	void _input_event(Node *p_viewport, const Ref<InputEvent> &p_input_event, int p_shape);
+	void _input_event_call(Viewport *p_viewport, const Ref<InputEvent> &p_input_event, int p_shape);
 	void _mouse_enter();
 	void _mouse_exit();
+
+	void _mouse_shape_enter(int p_shape);
+	void _mouse_shape_exit(int p_shape);
 
 	void set_only_update_transform_changes(bool p_enable);
 	bool is_only_update_transform_changes_enabled() const;
 
 	void set_body_mode(PhysicsServer2D::BodyMode p_mode);
 
+	GDVIRTUAL3(_input_event, Viewport *, Ref<InputEvent>, int)
 public:
 	void set_collision_layer(uint32_t p_layer);
 	uint32_t get_collision_layer() const;
@@ -104,11 +109,11 @@ public:
 	void set_collision_mask(uint32_t p_mask);
 	uint32_t get_collision_mask() const;
 
-	void set_collision_layer_bit(int p_bit, bool p_value);
-	bool get_collision_layer_bit(int p_bit) const;
+	void set_collision_layer_value(int p_layer_number, bool p_value);
+	bool get_collision_layer_value(int p_layer_number) const;
 
-	void set_collision_mask_bit(int p_bit, bool p_value);
-	bool get_collision_mask_bit(int p_bit) const;
+	void set_collision_mask_value(int p_layer_number, bool p_value);
+	bool get_collision_mask_value(int p_layer_number) const;
 
 	void set_disable_mode(DisableMode p_mode);
 	DisableMode get_disable_mode() const;

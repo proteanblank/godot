@@ -35,6 +35,8 @@
 #include "gdscript_cache.h"
 #include "gdscript_utility_functions.h"
 
+#include "core/config/project_settings.h"
+
 bool GDScriptCompiler::_is_class_member_property(CodeGen &codegen, const StringName &p_name) {
 	if (codegen.function_node && codegen.function_node->is_static) {
 		return false;
@@ -107,7 +109,7 @@ GDScriptDataType GDScriptCompiler::_gdtype_from_datatype(const GDScriptParser::D
 			// Locate class by constructing the path to it and following that path
 			GDScriptParser::ClassNode *class_type = p_datatype.class_type;
 			if (class_type) {
-				if (class_type->fqcn.begins_with(main_script->path) || (!main_script->name.is_empty() && class_type->fqcn.begins_with(main_script->name))) {
+				if ((!main_script->path.is_empty() && class_type->fqcn.begins_with(main_script->path)) || (!main_script->name.is_empty() && class_type->fqcn.begins_with(main_script->name))) {
 					// Local class.
 					List<StringName> names;
 					while (class_type->outer) {
@@ -126,8 +128,7 @@ GDScriptDataType GDScriptCompiler::_gdtype_from_datatype(const GDScriptParser::D
 						names.pop_back();
 					}
 					result.kind = GDScriptDataType::GDSCRIPT;
-					result.script_type_ref = script;
-					result.script_type = result.script_type_ref.ptr();
+					result.script_type = script.ptr();
 					result.native_type = script->get_instance_base_type();
 				} else {
 					result.kind = GDScriptDataType::GDSCRIPT;
@@ -317,10 +318,21 @@ GDScriptCodeGenerator::Address GDScriptCompiler::_parse_expression(CodeGen &code
 				}
 			}
 
+			// Try globals.
 			if (GDScriptLanguage::get_singleton()->get_global_map().has(identifier)) {
-				int idx = GDScriptLanguage::get_singleton()->get_global_map()[identifier];
-				Variant global = GDScriptLanguage::get_singleton()->get_global_array()[idx];
-				return codegen.add_constant(global); // TODO: Get type.
+				// If it's an autoload singleton, we postpone to load it at runtime.
+				// This is so one autoload doesn't try to load another before it's compiled.
+				OrderedHashMap<StringName, ProjectSettings::AutoloadInfo> autoloads = ProjectSettings::get_singleton()->get_autoload_list();
+				if (autoloads.has(identifier) && autoloads[identifier].is_singleton) {
+					GDScriptCodeGenerator::Address global = codegen.add_temporary(_gdtype_from_datatype(in->get_datatype()));
+					int idx = GDScriptLanguage::get_singleton()->get_global_map()[identifier];
+					gen->write_store_global(global, idx);
+					return global;
+				} else {
+					int idx = GDScriptLanguage::get_singleton()->get_global_map()[identifier];
+					Variant global = GDScriptLanguage::get_singleton()->get_global_array()[idx];
+					return codegen.add_constant(global);
+				}
 			}
 
 			// Try global classes.
@@ -428,7 +440,7 @@ GDScriptCodeGenerator::Address GDScriptCompiler::_parse_expression(CodeGen &code
 						break;
 					case GDScriptParser::DictionaryNode::LUA_TABLE:
 						// Lua-style: key is an identifier interpreted as StringName.
-						StringName key = static_cast<const GDScriptParser::IdentifierNode *>(dn->elements[i].key)->name;
+						StringName key = dn->elements[i].key->reduced_value.operator StringName();
 						element = codegen.add_constant(key);
 						break;
 				}
@@ -952,7 +964,7 @@ GDScriptCodeGenerator::Address GDScriptCompiler::_parse_expression(CodeGen &code
 
 				// Perform operator if any.
 				if (assignment->operation != GDScriptParser::AssignmentNode::OP_NONE) {
-					GDScriptCodeGenerator::Address value = codegen.add_temporary();
+					GDScriptCodeGenerator::Address value = codegen.add_temporary(_gdtype_from_datatype(subscript->get_datatype()));
 					if (subscript->is_attribute) {
 						gen->write_get_named(value, name, prev_base);
 					} else {
@@ -981,8 +993,7 @@ GDScriptCodeGenerator::Address GDScriptCompiler::_parse_expression(CodeGen &code
 				assigned = prev_base;
 
 				// Set back the values into their bases.
-				for (List<ChainInfo>::Element *E = set_chain.front(); E; E = E->next()) {
-					const ChainInfo &info = E->get();
+				for (const ChainInfo &info : set_chain) {
 					if (!info.is_named) {
 						gen->write_set(info.base, info.key, assigned);
 						if (info.key.mode == GDScriptCodeGenerator::Address::TEMPORARY) {
@@ -1859,7 +1870,7 @@ GDScriptFunction *GDScriptCompiler::_parse_function(Error &r_error, GDScript *p_
 
 	StringName func_name;
 	bool is_static = false;
-	MultiplayerAPI::RPCMode rpc_mode = MultiplayerAPI::RPC_MODE_DISABLED;
+	Multiplayer::RPCConfig rpc_config;
 	GDScriptDataType return_type;
 	return_type.has_type = true;
 	return_type.kind = GDScriptDataType::BUILTIN;
@@ -1872,7 +1883,7 @@ GDScriptFunction *GDScriptCompiler::_parse_function(Error &r_error, GDScript *p_
 			func_name = "<anonymous lambda>";
 		}
 		is_static = p_func->is_static;
-		rpc_mode = p_func->rpc_mode;
+		rpc_config = p_func->rpc_config;
 		return_type = _gdtype_from_datatype(p_func->get_datatype(), p_script);
 	} else {
 		if (p_for_ready) {
@@ -1883,7 +1894,7 @@ GDScriptFunction *GDScriptCompiler::_parse_function(Error &r_error, GDScript *p_
 	}
 
 	codegen.function_name = func_name;
-	codegen.generator->write_start(p_script, func_name, is_static, rpc_mode, return_type);
+	codegen.generator->write_start(p_script, func_name, is_static, rpc_config, return_type);
 
 	int optional_parameters = 0;
 
@@ -2088,7 +2099,7 @@ Error GDScriptCompiler::_parse_setter_getter(GDScript *p_script, const GDScriptP
 		return_type = _gdtype_from_datatype(p_variable->get_datatype(), p_script);
 	}
 
-	codegen.generator->write_start(p_script, func_name, false, p_variable->rpc_mode, return_type);
+	codegen.generator->write_start(p_script, func_name, false, Multiplayer::RPCConfig(), return_type);
 
 	if (p_is_setter) {
 		uint32_t par_addr = codegen.generator->add_parameter(p_variable->setter_parameter->name, false, _gdtype_from_datatype(p_variable->get_datatype()));
@@ -2188,6 +2199,13 @@ Error GDScriptCompiler::_parse_class_level(GDScript *p_script, const GDScriptPar
 	p_script->tool = parser->is_tool();
 	p_script->name = p_class->identifier ? p_class->identifier->name : "";
 
+	if (p_script->name != "") {
+		if (ClassDB::class_exists(p_script->name) && ClassDB::is_class_exposed(p_script->name)) {
+			_set_error("The class '" + p_script->name + "' shadows a native class", p_class);
+			return ERR_ALREADY_EXISTS;
+		}
+	}
+
 	Ref<GDScriptNativeClass> native;
 
 	GDScriptDataType base_type = _gdtype_from_datatype(p_class->base_type);
@@ -2268,7 +2286,6 @@ Error GDScriptCompiler::_parse_class_level(GDScript *p_script, const GDScriptPar
 						}
 						break;
 				}
-				minfo.rpc_mode = variable->rpc_mode;
 				minfo.data_type = _gdtype_from_datatype(variable->get_datatype(), p_script);
 
 				PropertyInfo prop_info = minfo.data_type;
@@ -2339,28 +2356,6 @@ Error GDScriptCompiler::_parse_class_level(GDScript *p_script, const GDScriptPar
 			case GDScriptParser::ClassNode::Member::SIGNAL: {
 				const GDScriptParser::SignalNode *signal = member.signal;
 				StringName name = signal->identifier->name;
-
-				GDScript *c = p_script;
-
-				while (c) {
-					if (c->_signals.has(name)) {
-						_set_error("Signal '" + name + "' redefined (in current or parent class)", p_class);
-						return ERR_ALREADY_EXISTS;
-					}
-
-					if (c->base.is_valid()) {
-						c = c->base.ptr();
-					} else {
-						c = nullptr;
-					}
-				}
-
-				if (native.is_valid()) {
-					if (ClassDB::has_signal(native->get_name(), name)) {
-						_set_error("Signal '" + name + "' redefined (original in native class '" + String(native->get_name()) + "')", p_class);
-						return ERR_ALREADY_EXISTS;
-					}
-				}
 
 				Vector<StringName> parameters_names;
 				parameters_names.resize(signal->parameters.size());

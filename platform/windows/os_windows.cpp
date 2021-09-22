@@ -165,6 +165,10 @@ BOOL WINAPI HandlerRoutine(_In_ DWORD dwCtrlType) {
 	}
 }
 
+void OS_Windows::alert(const String &p_alert, const String &p_title) {
+	MessageBoxW(nullptr, (LPCWSTR)(p_alert.utf16().get_data()), (LPCWSTR)(p_title.utf16().get_data()), MB_OK | MB_ICONEXCLAMATION | MB_TASKMODAL);
+}
+
 void OS_Windows::initialize_debugging() {
 	SetConsoleCtrlHandler(HandlerRoutine, TRUE);
 }
@@ -407,8 +411,8 @@ String OS_Windows::_quote_command_line_argument(const String &p_text) const {
 Error OS_Windows::execute(const String &p_path, const List<String> &p_arguments, String *r_pipe, int *r_exitcode, bool read_stderr, Mutex *p_pipe_mutex) {
 	String path = p_path.replace("/", "\\");
 	String command = _quote_command_line_argument(path);
-	for (const List<String>::Element *E = p_arguments.front(); E; E = E->next()) {
-		command += " " + _quote_command_line_argument(E->get());
+	for (const String &E : p_arguments) {
+		command += " " + _quote_command_line_argument(E);
 	}
 
 	if (r_pipe) {
@@ -463,8 +467,8 @@ Error OS_Windows::execute(const String &p_path, const List<String> &p_arguments,
 Error OS_Windows::create_process(const String &p_path, const List<String> &p_arguments, ProcessID *r_child_id) {
 	String path = p_path.replace("/", "\\");
 	String command = _quote_command_line_argument(path);
-	for (const List<String>::Element *E = p_arguments.front(); E; E = E->next()) {
-		command += " " + _quote_command_line_argument(E->get());
+	for (const String &E : p_arguments) {
+		command += " " + _quote_command_line_argument(E);
 	}
 
 	ProcessInfo pi;
@@ -553,8 +557,27 @@ String OS_Windows::get_stdin_string(bool p_block) {
 }
 
 Error OS_Windows::shell_open(String p_uri) {
-	ShellExecuteW(nullptr, nullptr, (LPCWSTR)(p_uri.utf16().get_data()), nullptr, nullptr, SW_SHOWNORMAL);
-	return OK;
+	INT_PTR ret = (INT_PTR)ShellExecuteW(nullptr, nullptr, (LPCWSTR)(p_uri.utf16().get_data()), nullptr, nullptr, SW_SHOWNORMAL);
+	if (ret > 32) {
+		return OK;
+	} else {
+		switch (ret) {
+			case ERROR_FILE_NOT_FOUND:
+			case SE_ERR_DLLNOTFOUND:
+				return ERR_FILE_NOT_FOUND;
+			case ERROR_PATH_NOT_FOUND:
+				return ERR_FILE_BAD_PATH;
+			case ERROR_BAD_FORMAT:
+				return ERR_FILE_CORRUPT;
+			case SE_ERR_ACCESSDENIED:
+				return ERR_UNAUTHORIZED;
+			case 0:
+			case SE_ERR_OOM:
+				return ERR_OUT_OF_MEMORY;
+			default:
+				return FAILED;
+		}
+	}
 }
 
 String OS_Windows::get_locale() const {
@@ -677,7 +700,7 @@ String OS_Windows::get_godot_dir_name() const {
 	return String(VERSION_SHORT_NAME).capitalize();
 }
 
-String OS_Windows::get_system_dir(SystemDir p_dir) const {
+String OS_Windows::get_system_dir(SystemDir p_dir, bool p_shared_storage) const {
 	KNOWNFOLDERID id;
 
 	switch (p_dir) {

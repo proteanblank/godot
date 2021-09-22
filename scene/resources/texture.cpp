@@ -131,25 +131,6 @@ void ImageTexture::_get_property_list(List<PropertyInfo> *p_list) const {
 	p_list->push_back(PropertyInfo(Variant::VECTOR2, "size", PROPERTY_HINT_NONE, ""));
 }
 
-void ImageTexture::_reload_hook(const RID &p_hook) {
-	String path = get_path();
-	if (!path.is_resource_file()) {
-		return;
-	}
-
-	Ref<Image> img;
-	img.instantiate();
-	Error err = ImageLoader::load_image(path, img);
-
-	ERR_FAIL_COND_MSG(err != OK, "Cannot load image from path '" + path + "'.");
-
-	RID new_texture = RenderingServer::get_singleton()->texture_2d_create(img);
-	RenderingServer::get_singleton()->texture_replace(texture, new_texture);
-
-	notify_property_list_changed();
-	emit_changed();
-}
-
 void ImageTexture::create_from_image(const Ref<Image> &p_image) {
 	ERR_FAIL_COND_MSG(p_image.is_null() || p_image->is_empty(), "Invalid image");
 	w = p_image->get_width();
@@ -190,10 +171,6 @@ void ImageTexture::update(const Ref<Image> &p_image) {
 
 	alpha_cache.unref();
 	image_stored = true;
-}
-
-void ImageTexture::_resource_path_changed() {
-	String path = get_path();
 }
 
 Ref<Image> ImageTexture::get_image() const {
@@ -303,7 +280,6 @@ void ImageTexture::_bind_methods() {
 
 	ClassDB::bind_method(D_METHOD("update", "image"), &ImageTexture::update);
 	ClassDB::bind_method(D_METHOD("set_size_override", "size"), &ImageTexture::set_size_override);
-	ClassDB::bind_method(D_METHOD("_reload_hook", "rid"), &ImageTexture::_reload_hook);
 }
 
 ImageTexture::ImageTexture() {}
@@ -354,11 +330,11 @@ Ref<Image> StreamTexture2D::load_image_from_file(FileAccess *f, int p_size_limit
 			}
 
 			Ref<Image> img;
-			if (data_format == DATA_FORMAT_BASIS_UNIVERSAL) {
+			if (data_format == DATA_FORMAT_BASIS_UNIVERSAL && Image::basis_universal_unpacker) {
 				img = Image::basis_universal_unpacker(pv);
-			} else if (data_format == DATA_FORMAT_PNG) {
+			} else if (data_format == DATA_FORMAT_PNG && Image::png_unpacker) {
 				img = Image::png_unpacker(pv);
-			} else {
+			} else if (data_format == DATA_FORMAT_WEBP && Image::webp_unpacker) {
 				img = Image::webp_unpacker(pv);
 			}
 
@@ -1758,11 +1734,16 @@ void GradientTexture::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("get_gradient"), &GradientTexture::get_gradient);
 
 	ClassDB::bind_method(D_METHOD("set_width", "width"), &GradientTexture::set_width);
+	// The `get_width()` method is already exposed by the parent class Texture2D.
+
+	ClassDB::bind_method(D_METHOD("set_use_hdr", "enabled"), &GradientTexture::set_use_hdr);
+	ClassDB::bind_method(D_METHOD("is_using_hdr"), &GradientTexture::is_using_hdr);
 
 	ClassDB::bind_method(D_METHOD("_update"), &GradientTexture::_update);
 
 	ADD_PROPERTY(PropertyInfo(Variant::OBJECT, "gradient", PROPERTY_HINT_RESOURCE_TYPE, "Gradient"), "set_gradient", "get_gradient");
 	ADD_PROPERTY(PropertyInfo(Variant::INT, "width", PROPERTY_HINT_RANGE, "1,4096"), "set_width", "get_width");
+	ADD_PROPERTY(PropertyInfo(Variant::BOOL, "use_hdr"), "set_use_hdr", "is_using_hdr");
 }
 
 void GradientTexture::set_gradient(Ref<Gradient> p_gradient) {
@@ -1790,7 +1771,7 @@ void GradientTexture::_queue_update() {
 	}
 
 	update_pending = true;
-	call_deferred("_update");
+	call_deferred(SNAME("_update"));
 }
 
 void GradientTexture::_update() {
@@ -1800,30 +1781,49 @@ void GradientTexture::_update() {
 		return;
 	}
 
-	Vector<uint8_t> data;
-	data.resize(width * 4);
-	{
-		uint8_t *wd8 = data.ptrw();
+	if (use_hdr) {
+		// High dynamic range.
+		Ref<Image> image = memnew(Image(width, 1, false, Image::FORMAT_RGBAF));
 		Gradient &g = **gradient;
-
+		// `create()` isn't available for non-uint8_t data, so fill in the data manually.
 		for (int i = 0; i < width; i++) {
 			float ofs = float(i) / (width - 1);
-			Color color = g.get_color_at_offset(ofs);
-
-			wd8[i * 4 + 0] = uint8_t(CLAMP(color.r * 255.0, 0, 255));
-			wd8[i * 4 + 1] = uint8_t(CLAMP(color.g * 255.0, 0, 255));
-			wd8[i * 4 + 2] = uint8_t(CLAMP(color.b * 255.0, 0, 255));
-			wd8[i * 4 + 3] = uint8_t(CLAMP(color.a * 255.0, 0, 255));
+			image->set_pixel(i, 0, g.get_color_at_offset(ofs));
 		}
-	}
 
-	Ref<Image> image = memnew(Image(width, 1, false, Image::FORMAT_RGBA8, data));
-
-	if (texture.is_valid()) {
-		RID new_texture = RS::get_singleton()->texture_2d_create(image);
-		RS::get_singleton()->texture_replace(texture, new_texture);
+		if (texture.is_valid()) {
+			RID new_texture = RS::get_singleton()->texture_2d_create(image);
+			RS::get_singleton()->texture_replace(texture, new_texture);
+		} else {
+			texture = RS::get_singleton()->texture_2d_create(image);
+		}
 	} else {
-		texture = RS::get_singleton()->texture_2d_create(image);
+		// Low dynamic range. "Overbright" colors will be clamped.
+		Vector<uint8_t> data;
+		data.resize(width * 4);
+		{
+			uint8_t *wd8 = data.ptrw();
+			Gradient &g = **gradient;
+
+			for (int i = 0; i < width; i++) {
+				float ofs = float(i) / (width - 1);
+				Color color = g.get_color_at_offset(ofs);
+
+				wd8[i * 4 + 0] = uint8_t(CLAMP(color.r * 255.0, 0, 255));
+				wd8[i * 4 + 1] = uint8_t(CLAMP(color.g * 255.0, 0, 255));
+				wd8[i * 4 + 2] = uint8_t(CLAMP(color.b * 255.0, 0, 255));
+				wd8[i * 4 + 3] = uint8_t(CLAMP(color.a * 255.0, 0, 255));
+			}
+		}
+
+		Ref<Image> image = memnew(Image(width, 1, false, Image::FORMAT_RGBA8, data));
+
+		if (texture.is_valid()) {
+			RID new_texture = RS::get_singleton()->texture_2d_create(image);
+			RS::get_singleton()->texture_replace(texture, new_texture);
+		} else {
+			texture = RS::get_singleton()->texture_2d_create(image);
+		}
 	}
 
 	emit_changed();
@@ -1837,6 +1837,19 @@ void GradientTexture::set_width(int p_width) {
 
 int GradientTexture::get_width() const {
 	return width;
+}
+
+void GradientTexture::set_use_hdr(bool p_enabled) {
+	if (p_enabled == use_hdr) {
+		return;
+	}
+
+	use_hdr = p_enabled;
+	_queue_update();
+}
+
+bool GradientTexture::is_using_hdr() const {
+	return use_hdr;
 }
 
 Ref<Image> GradientTexture::get_image() const {
@@ -2587,7 +2600,10 @@ RID CameraTexture::get_rid() const {
 	if (feed.is_valid()) {
 		return feed->get_texture(which_feed);
 	} else {
-		return RID();
+		if (_texture.is_null()) {
+			_texture = RenderingServer::get_singleton()->texture_2d_placeholder_create();
+		}
+		return _texture;
 	}
 }
 
@@ -2643,5 +2659,7 @@ bool CameraTexture::get_camera_active() const {
 CameraTexture::CameraTexture() {}
 
 CameraTexture::~CameraTexture() {
-	// nothing to do here yet
+	if (_texture.is_valid()) {
+		RenderingServer::get_singleton()->free(_texture);
+	}
 }

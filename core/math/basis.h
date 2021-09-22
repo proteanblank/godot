@@ -35,6 +35,9 @@
 #include "core/math/vector3.h"
 
 class Basis {
+private:
+	void _set_diagonal(const Vector3 &p_diag);
+
 public:
 	Vector3 elements[3] = {
 		Vector3(1, 0, 0),
@@ -87,6 +90,8 @@ public:
 	void get_rotation_axis_angle_local(Vector3 &p_axis, real_t &p_angle) const;
 	Quaternion get_rotation_quaternion() const;
 	Vector3 get_rotation() const { return get_rotation_euler(); };
+
+	void rotate_to_align(Vector3 p_start_direction, Vector3 p_end_direction);
 
 	Vector3 rotref_posscale_decomposition(Basis &rotref) const;
 
@@ -164,8 +169,6 @@ public:
 	int get_orthogonal_index() const;
 	void set_orthogonal_index(int p_index);
 
-	void set_diagonal(const Vector3 &p_diag);
-
 	bool is_orthogonal() const;
 	bool is_diagonal() const;
 	bool is_rotation() const;
@@ -242,6 +245,8 @@ public:
 
 	operator Quaternion() const { return get_quaternion(); }
 
+	static Basis looking_at(const Vector3 &p_target, const Vector3 &p_up = Vector3(0, 1, 0));
+
 	Basis(const Quaternion &p_quaternion) { set_quaternion(p_quaternion); };
 	Basis(const Quaternion &p_quaternion, const Vector3 &p_scale) { set_quaternion_scale(p_quaternion, p_scale); }
 
@@ -250,6 +255,7 @@ public:
 
 	Basis(const Vector3 &p_axis, real_t p_phi) { set_axis_angle(p_axis, p_phi); }
 	Basis(const Vector3 &p_axis, real_t p_phi, const Vector3 &p_scale) { set_axis_angle_scale(p_axis, p_phi, p_scale); }
+	static Basis from_scale(const Vector3 &p_scale);
 
 	_FORCE_INLINE_ Basis(const Vector3 &row0, const Vector3 &row1, const Vector3 &row2) {
 		elements[0] = row0;

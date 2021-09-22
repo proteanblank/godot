@@ -90,8 +90,8 @@ void MeshInstance3DEditor::_menu_option(int p_option) {
 
 			ur->create_action(TTR("Create Static Trimesh Body"));
 
-			for (List<Node *>::Element *E = selection.front(); E; E = E->next()) {
-				MeshInstance3D *instance = Object::cast_to<MeshInstance3D>(E->get());
+			for (Node *E : selection) {
+				MeshInstance3D *instance = Object::cast_to<MeshInstance3D>(E);
 				if (!instance) {
 					continue;
 				}
@@ -202,7 +202,8 @@ void MeshInstance3DEditor::_menu_option(int p_option) {
 				return;
 			}
 
-			Vector<Ref<Shape3D>> shapes = mesh->convex_decompose();
+			Mesh::ConvexDecompositionSettings settings;
+			Vector<Ref<Shape3D>> shapes = mesh->convex_decompose(settings);
 
 			if (!shapes.size()) {
 				err_dialog->set_text(TTR("Couldn't create any collision shapes."));
@@ -332,7 +333,7 @@ void MeshInstance3DEditor::_create_uv_lines(int p_layer) {
 
 		Vector<Vector2> uv = a[p_layer == 0 ? Mesh::ARRAY_TEX_UV : Mesh::ARRAY_TEX_UV2];
 		if (uv.size() == 0) {
-			err_dialog->set_text(TTR("Model has no UV in this layer"));
+			err_dialog->set_text(vformat(TTR("Mesh has no UV in layer %d."), p_layer + 1));
 			err_dialog->popup_centered();
 			return;
 		}
@@ -382,9 +383,10 @@ void MeshInstance3DEditor::_debug_uv_draw() {
 	}
 
 	debug_uv->set_clip_contents(true);
-	debug_uv->draw_rect(Rect2(Vector2(), debug_uv->get_size()), Color(0.2, 0.2, 0.0));
+	debug_uv->draw_rect(Rect2(Vector2(), debug_uv->get_size()), get_theme_color(SNAME("dark_color_3"), SNAME("Editor")));
 	debug_uv->draw_set_transform(Vector2(), 0, debug_uv->get_size());
-	debug_uv->draw_multiline(uv_lines, Color(1.0, 0.8, 0.7));
+	// Use a translucent color to allow overlapping triangles to be visible.
+	debug_uv->draw_multiline(uv_lines, get_theme_color(SNAME("mono_color"), SNAME("Editor")) * Color(1, 1, 1, 0.5), Math::round(EDSCALE));
 }
 
 void MeshInstance3DEditor::_create_outline_mesh() {
@@ -441,7 +443,7 @@ MeshInstance3DEditor::MeshInstance3DEditor() {
 	Node3DEditor::get_singleton()->add_control_to_menu_panel(options);
 
 	options->set_text(TTR("Mesh"));
-	options->set_icon(EditorNode::get_singleton()->get_gui_base()->get_theme_icon("MeshInstance3D", "EditorIcons"));
+	options->set_icon(EditorNode::get_singleton()->get_gui_base()->get_theme_icon(SNAME("MeshInstance3D"), SNAME("EditorIcons")));
 
 	options->get_popup()->add_item(TTR("Create Trimesh Static Body"), MENU_OPTION_CREATE_STATIC_TRIMESH_BODY);
 	options->get_popup()->set_item_tooltip(options->get_popup()->get_item_count() - 1, TTR("Creates a StaticBody3D and assigns a polygon-based collision shape to it automatically.\nThis is the most accurate (but slowest) option for collision detection."));

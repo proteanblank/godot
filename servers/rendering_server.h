@@ -483,6 +483,17 @@ public:
 
 	virtual void shadows_quality_set(ShadowQuality p_quality) = 0;
 	virtual void directional_shadow_quality_set(ShadowQuality p_quality) = 0;
+
+	enum LightProjectorFilter {
+		LIGHT_PROJECTOR_FILTER_NEAREST,
+		LIGHT_PROJECTOR_FILTER_NEAREST_MIPMAPS,
+		LIGHT_PROJECTOR_FILTER_LINEAR,
+		LIGHT_PROJECTOR_FILTER_LINEAR_MIPMAPS,
+		LIGHT_PROJECTOR_FILTER_LINEAR_MIPMAPS_ANISOTROPIC,
+	};
+
+	virtual void light_projectors_set_filter(LightProjectorFilter p_filter) = 0;
+
 	/* PROBE API */
 
 	virtual RID reflection_probe_create() = 0;
@@ -534,6 +545,16 @@ public:
 	virtual void decal_set_distance_fade(RID p_decal, bool p_enabled, float p_begin, float p_length) = 0;
 	virtual void decal_set_fade(RID p_decal, float p_above, float p_below) = 0;
 	virtual void decal_set_normal_fade(RID p_decal, float p_fade) = 0;
+
+	enum DecalFilter {
+		DECAL_FILTER_NEAREST,
+		DECAL_FILTER_NEAREST_MIPMAPS,
+		DECAL_FILTER_LINEAR,
+		DECAL_FILTER_LINEAR_MIPMAPS,
+		DECAL_FILTER_LINEAR_MIPMAPS_ANISOTROPIC,
+	};
+
+	virtual void decals_set_filter(DecalFilter p_quality) = 0;
 
 	/* VOXEL GI API */
 
@@ -592,13 +613,13 @@ public:
 	virtual void particles_set_emitting(RID p_particles, bool p_enable) = 0;
 	virtual bool particles_get_emitting(RID p_particles) = 0;
 	virtual void particles_set_amount(RID p_particles, int p_amount) = 0;
-	virtual void particles_set_lifetime(RID p_particles, float p_lifetime) = 0;
+	virtual void particles_set_lifetime(RID p_particles, double p_lifetime) = 0;
 	virtual void particles_set_one_shot(RID p_particles, bool p_one_shot) = 0;
-	virtual void particles_set_pre_process_time(RID p_particles, float p_time) = 0;
+	virtual void particles_set_pre_process_time(RID p_particles, double p_time) = 0;
 	virtual void particles_set_explosiveness_ratio(RID p_particles, float p_ratio) = 0;
 	virtual void particles_set_randomness_ratio(RID p_particles, float p_ratio) = 0;
 	virtual void particles_set_custom_aabb(RID p_particles, const AABB &p_aabb) = 0;
-	virtual void particles_set_speed_scale(RID p_particles, float p_scale) = 0;
+	virtual void particles_set_speed_scale(RID p_particles, double p_scale) = 0;
 	virtual void particles_set_use_local_coordinates(RID p_particles, bool p_enable) = 0;
 	virtual void particles_set_process_material(RID p_particles, RID p_material) = 0;
 	virtual void particles_set_fixed_fps(RID p_particles, int p_fps) = 0;
@@ -666,11 +687,11 @@ public:
 
 	virtual void particles_collision_set_collision_type(RID p_particles_collision, ParticlesCollisionType p_type) = 0;
 	virtual void particles_collision_set_cull_mask(RID p_particles_collision, uint32_t p_cull_mask) = 0;
-	virtual void particles_collision_set_sphere_radius(RID p_particles_collision, float p_radius) = 0; //for spheres
+	virtual void particles_collision_set_sphere_radius(RID p_particles_collision, real_t p_radius) = 0; //for spheres
 	virtual void particles_collision_set_box_extents(RID p_particles_collision, const Vector3 &p_extents) = 0; //for non-spheres
-	virtual void particles_collision_set_attractor_strength(RID p_particles_collision, float p_strength) = 0;
-	virtual void particles_collision_set_attractor_directionality(RID p_particles_collision, float p_directionality) = 0;
-	virtual void particles_collision_set_attractor_attenuation(RID p_particles_collision, float p_curve) = 0;
+	virtual void particles_collision_set_attractor_strength(RID p_particles_collision, real_t p_strength) = 0;
+	virtual void particles_collision_set_attractor_directionality(RID p_particles_collision, real_t p_directionality) = 0;
+	virtual void particles_collision_set_attractor_attenuation(RID p_particles_collision, real_t p_curve) = 0;
 	virtual void particles_collision_set_field_texture(RID p_particles_collision, RID p_texture) = 0; //for SDF and vector field, heightfield is dynamic
 
 	virtual void particles_collision_height_field_update(RID p_particles_collision) = 0; //for SDF and vector field
@@ -731,9 +752,19 @@ public:
 		CANVAS_ITEM_TEXTURE_REPEAT_MAX,
 	};
 
+	enum ViewportScale3D {
+		VIEWPORT_SCALE_3D_DISABLED,
+		VIEWPORT_SCALE_3D_75_PERCENT,
+		VIEWPORT_SCALE_3D_50_PERCENT,
+		VIEWPORT_SCALE_3D_33_PERCENT,
+		VIEWPORT_SCALE_3D_25_PERCENT,
+		VIEWPORT_SCALE_3D_MAX,
+	};
+
 	virtual RID viewport_create() = 0;
 
 	virtual void viewport_set_use_xr(RID p_viewport, bool p_use_xr) = 0;
+	virtual void viewport_set_scale_3d(RID p_viewport, ViewportScale3D p_scale_3d) = 0;
 	virtual void viewport_set_size(RID p_viewport, int p_width, int p_height) = 0;
 	virtual void viewport_set_active(RID p_viewport, bool p_active) = 0;
 	virtual void viewport_set_parent_viewport(RID p_viewport, RID p_parent_viewport) = 0;
@@ -805,7 +836,6 @@ public:
 		VIEWPORT_MSAA_2X,
 		VIEWPORT_MSAA_4X,
 		VIEWPORT_MSAA_8X,
-		VIEWPORT_MSAA_16X,
 		VIEWPORT_MSAA_MAX,
 	};
 
@@ -879,8 +909,8 @@ public:
 	virtual void viewport_set_debug_draw(RID p_viewport, ViewportDebugDraw p_draw) = 0;
 
 	virtual void viewport_set_measure_render_time(RID p_viewport, bool p_enable) = 0;
-	virtual float viewport_get_measured_render_time_cpu(RID p_viewport) const = 0;
-	virtual float viewport_get_measured_render_time_gpu(RID p_viewport) const = 0;
+	virtual double viewport_get_measured_render_time_cpu(RID p_viewport) const = 0;
+	virtual double viewport_get_measured_render_time_gpu(RID p_viewport) const = 0;
 
 	/* SKY API */
 
@@ -1227,6 +1257,7 @@ public:
 	virtual void canvas_item_add_circle(RID p_item, const Point2 &p_pos, float p_radius, const Color &p_color) = 0;
 	virtual void canvas_item_add_texture_rect(RID p_item, const Rect2 &p_rect, RID p_texture, bool p_tile = false, const Color &p_modulate = Color(1, 1, 1), bool p_transpose = false) = 0;
 	virtual void canvas_item_add_texture_rect_region(RID p_item, const Rect2 &p_rect, RID p_texture, const Rect2 &p_src_rect, const Color &p_modulate = Color(1, 1, 1), bool p_transpose = false, bool p_clip_uv = false) = 0;
+	virtual void canvas_item_add_msdf_texture_rect_region(RID p_item, const Rect2 &p_rect, RID p_texture, const Rect2 &p_src_rect, const Color &p_modulate = Color(1, 1, 1), int p_outline_size = 0, float p_px_range = 1.0) = 0;
 	virtual void canvas_item_add_nine_patch(RID p_item, const Rect2 &p_rect, const Rect2 &p_source, RID p_texture, const Vector2 &p_topleft, const Vector2 &p_bottomright, NinePatchAxisMode p_x_axis_mode = NINE_PATCH_STRETCH, NinePatchAxisMode p_y_axis_mode = NINE_PATCH_STRETCH, bool p_draw_center = true, const Color &p_modulate = Color(1, 1, 1)) = 0;
 	virtual void canvas_item_add_primitive(RID p_item, const Vector<Point2> &p_points, const Vector<Color> &p_colors, const Vector<Point2> &p_uvs, RID p_texture, float p_width = 1.0) = 0;
 	virtual void canvas_item_add_polygon(RID p_item, const Vector<Point2> &p_points, const Vector<Color> &p_colors, const Vector<Point2> &p_uvs = Vector<Point2>(), RID p_texture = RID()) = 0;
@@ -1415,15 +1446,15 @@ public:
 
 	struct FrameProfileArea {
 		String name;
-		float gpu_msec;
-		float cpu_msec;
+		double gpu_msec;
+		double cpu_msec;
 	};
 
 	virtual void set_frame_profiling_enabled(bool p_enable) = 0;
 	virtual Vector<FrameProfileArea> get_frame_profile() = 0;
 	virtual uint64_t get_frame_profile_frame() = 0;
 
-	virtual float get_frame_setup_time_cpu() const = 0;
+	virtual double get_frame_setup_time_cpu() const = 0;
 
 	virtual void gi_set_use_half_resolution(bool p_enable) = 0;
 
@@ -1436,7 +1467,7 @@ public:
 
 	virtual void sdfgi_set_debug_probe_select(const Vector3 &p_position, const Vector3 &p_dir) = 0;
 
-	virtual RID make_sphere_mesh(int p_lats, int p_lons, float p_radius);
+	virtual RID make_sphere_mesh(int p_lats, int p_lons, real_t p_radius);
 
 	virtual void mesh_add_surface_from_mesh_data(RID p_mesh, const Geometry3D::MeshData &p_mesh_data);
 	virtual void mesh_add_surface_from_planes(RID p_mesh, const Vector<Plane> &p_planes);
@@ -1461,6 +1492,7 @@ public:
 
 	virtual void set_print_gpu_profile(bool p_enable) = 0;
 
+	RenderingDevice *get_rendering_device() const;
 	RenderingDevice *create_local_rendering_device() const;
 
 	bool is_render_loop_enabled() const;
@@ -1499,10 +1531,12 @@ VARIANT_ENUM_CAST(RenderingServer::LightParam);
 VARIANT_ENUM_CAST(RenderingServer::LightBakeMode);
 VARIANT_ENUM_CAST(RenderingServer::LightOmniShadowMode);
 VARIANT_ENUM_CAST(RenderingServer::LightDirectionalShadowMode);
+VARIANT_ENUM_CAST(RenderingServer::LightProjectorFilter);
 VARIANT_ENUM_CAST(RenderingServer::ReflectionProbeUpdateMode);
 VARIANT_ENUM_CAST(RenderingServer::ReflectionProbeAmbientMode);
 VARIANT_ENUM_CAST(RenderingServer::VoxelGIQuality);
 VARIANT_ENUM_CAST(RenderingServer::DecalTexture);
+VARIANT_ENUM_CAST(RenderingServer::DecalFilter);
 VARIANT_ENUM_CAST(RenderingServer::ParticlesMode);
 VARIANT_ENUM_CAST(RenderingServer::ParticlesTransformAlign);
 VARIANT_ENUM_CAST(RenderingServer::ParticlesDrawOrder);
@@ -1519,6 +1553,7 @@ VARIANT_ENUM_CAST(RenderingServer::ViewportDebugDraw);
 VARIANT_ENUM_CAST(RenderingServer::ViewportOcclusionCullingBuildQuality);
 VARIANT_ENUM_CAST(RenderingServer::ViewportSDFOversize);
 VARIANT_ENUM_CAST(RenderingServer::ViewportSDFScale);
+VARIANT_ENUM_CAST(RenderingServer::ViewportScale3D);
 VARIANT_ENUM_CAST(RenderingServer::SkyMode);
 VARIANT_ENUM_CAST(RenderingServer::EnvironmentBG);
 VARIANT_ENUM_CAST(RenderingServer::EnvironmentAmbientSource);

@@ -43,15 +43,15 @@ void LocalizationEditor::_notification(int p_what) {
 
 		List<String> tfn;
 		ResourceLoader::get_recognized_extensions_for_type("Translation", &tfn);
-		for (List<String>::Element *E = tfn.front(); E; E = E->next()) {
-			translation_file_open->add_filter("*." + E->get());
+		for (const String &E : tfn) {
+			translation_file_open->add_filter("*." + E);
 		}
 
 		List<String> rfn;
 		ResourceLoader::get_recognized_extensions_for_type("Resource", &rfn);
-		for (List<String>::Element *E = rfn.front(); E; E = E->next()) {
-			translation_res_file_open_dialog->add_filter("*." + E->get());
-			translation_res_option_file_open_dialog->add_filter("*." + E->get());
+		for (const String &E : rfn) {
+			translation_res_file_open_dialog->add_filter("*." + E);
+			translation_res_option_file_open_dialog->add_filter("*." + E);
 		}
 
 		_update_pot_file_extensions();
@@ -176,7 +176,7 @@ void LocalizationEditor::_translation_res_select() {
 		return;
 	}
 
-	call_deferred("update_translations");
+	call_deferred(SNAME("update_translations"));
 }
 
 void LocalizationEditor::_translation_res_option_changed() {
@@ -371,15 +371,10 @@ void LocalizationEditor::_translation_filter_mode_changed(int p_mode) {
 
 void LocalizationEditor::_pot_add(const PackedStringArray &p_paths) {
 	PackedStringArray pot_translations = ProjectSettings::get_singleton()->get("internationalization/locale/translations_pot_files");
-
 	for (int i = 0; i < p_paths.size(); i++) {
-		for (int j = 0; j < pot_translations.size(); j++) {
-			if (pot_translations[j] == p_paths[i]) {
-				continue; //exists
-			}
+		if (!pot_translations.has(p_paths[i])) {
+			pot_translations.push_back(p_paths[i]);
 		}
-
-		pot_translations.push_back(p_paths[i]);
 	}
 
 	undo_redo->create_action(vformat(TTR("Add %d file(s) for POT generation"), p_paths.size()));
@@ -430,8 +425,8 @@ void LocalizationEditor::_update_pot_file_extensions() {
 	pot_file_open_dialog->clear_filters();
 	List<String> translation_parse_file_extensions;
 	EditorTranslationParser::get_singleton()->get_recognized_extensions(&translation_parse_file_extensions);
-	for (List<String>::Element *E = translation_parse_file_extensions.front(); E; E = E->next()) {
-		pot_file_open_dialog->add_filter("*." + E->get());
+	for (const String &E : translation_parse_file_extensions) {
+		pot_file_open_dialog->add_filter("*." + E);
 	}
 }
 
@@ -453,7 +448,7 @@ void LocalizationEditor::update_translations() {
 			t->set_text(0, translations[i].replace_first("res://", ""));
 			t->set_tooltip(0, translations[i]);
 			t->set_metadata(0, i);
-			t->add_button(0, get_theme_icon("Remove", "EditorIcons"), 0, false, TTR("Remove"));
+			t->add_button(0, get_theme_icon(SNAME("Remove"), SNAME("EditorIcons")), 0, false, TTR("Remove"));
 		}
 	}
 
@@ -560,8 +555,8 @@ void LocalizationEditor::update_translations() {
 		List<Variant> rk;
 		remaps.get_key_list(&rk);
 		Vector<String> keys;
-		for (List<Variant>::Element *E = rk.front(); E; E = E->next()) {
-			keys.push_back(E->get());
+		for (const Variant &E : rk) {
+			keys.push_back(E);
 		}
 		keys.sort();
 
@@ -571,7 +566,7 @@ void LocalizationEditor::update_translations() {
 			t->set_text(0, keys[i].replace_first("res://", ""));
 			t->set_tooltip(0, keys[i]);
 			t->set_metadata(0, keys[i]);
-			t->add_button(0, get_theme_icon("Remove", "EditorIcons"), 0, false, TTR("Remove"));
+			t->add_button(0, get_theme_icon(SNAME("Remove"), SNAME("EditorIcons")), 0, false, TTR("Remove"));
 			if (keys[i] == remap_selected) {
 				t->select(0);
 				translation_res_option_add_button->set_disabled(false);
@@ -588,7 +583,7 @@ void LocalizationEditor::update_translations() {
 					t2->set_text(0, path.replace_first("res://", ""));
 					t2->set_tooltip(0, path);
 					t2->set_metadata(0, j);
-					t2->add_button(0, get_theme_icon("Remove", "EditorIcons"), 0, false, TTR("Remove"));
+					t2->add_button(0, get_theme_icon(SNAME("Remove"), SNAME("EditorIcons")), 0, false, TTR("Remove"));
 					t2->set_cell_mode(1, TreeItem::CELL_MODE_RANGE);
 					t2->set_text(1, langnames);
 					t2->set_editable(1, true);
@@ -621,7 +616,7 @@ void LocalizationEditor::update_translations() {
 			t->set_text(0, pot_translations[i].replace_first("res://", ""));
 			t->set_tooltip(0, pot_translations[i]);
 			t->set_metadata(0, i);
-			t->add_button(0, get_theme_icon("Remove", "EditorIcons"), 0, false, TTR("Remove"));
+			t->add_button(0, get_theme_icon(SNAME("Remove"), SNAME("EditorIcons")), 0, false, TTR("Remove"));
 		}
 	}
 

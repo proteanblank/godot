@@ -47,8 +47,8 @@ private:
 	Vector<ColorRegion> color_regions;
 	Map<int, int> color_region_cache;
 
-	Dictionary keywords;
-	Dictionary member_keywords;
+	HashMap<StringName, Color> keywords;
+	HashMap<StringName, Color> member_keywords;
 
 	enum Type {
 		NONE,
@@ -80,7 +80,7 @@ private:
 
 public:
 	virtual void _update_cache() override;
-	virtual Dictionary _get_line_syntax_highlighting(int p_line) override;
+	virtual Dictionary _get_line_syntax_highlighting_impl(int p_line) override;
 
 	virtual String _get_name() const override;
 	virtual Array _get_supported_languages() const override;

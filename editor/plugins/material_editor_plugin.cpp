@@ -42,22 +42,22 @@ void MaterialEditor::_notification(int p_what) {
 		if (first_enter) {
 			//it's in propertyeditor so.. could be moved around
 
-			light_1_switch->set_normal_texture(get_theme_icon("MaterialPreviewLight1", "EditorIcons"));
-			light_1_switch->set_pressed_texture(get_theme_icon("MaterialPreviewLight1Off", "EditorIcons"));
-			light_2_switch->set_normal_texture(get_theme_icon("MaterialPreviewLight2", "EditorIcons"));
-			light_2_switch->set_pressed_texture(get_theme_icon("MaterialPreviewLight2Off", "EditorIcons"));
+			light_1_switch->set_normal_texture(get_theme_icon(SNAME("MaterialPreviewLight1"), SNAME("EditorIcons")));
+			light_1_switch->set_pressed_texture(get_theme_icon(SNAME("MaterialPreviewLight1Off"), SNAME("EditorIcons")));
+			light_2_switch->set_normal_texture(get_theme_icon(SNAME("MaterialPreviewLight2"), SNAME("EditorIcons")));
+			light_2_switch->set_pressed_texture(get_theme_icon(SNAME("MaterialPreviewLight2Off"), SNAME("EditorIcons")));
 
-			sphere_switch->set_normal_texture(get_theme_icon("MaterialPreviewSphereOff", "EditorIcons"));
-			sphere_switch->set_pressed_texture(get_theme_icon("MaterialPreviewSphere", "EditorIcons"));
-			box_switch->set_normal_texture(get_theme_icon("MaterialPreviewCubeOff", "EditorIcons"));
-			box_switch->set_pressed_texture(get_theme_icon("MaterialPreviewCube", "EditorIcons"));
+			sphere_switch->set_normal_texture(get_theme_icon(SNAME("MaterialPreviewSphereOff"), SNAME("EditorIcons")));
+			sphere_switch->set_pressed_texture(get_theme_icon(SNAME("MaterialPreviewSphere"), SNAME("EditorIcons")));
+			box_switch->set_normal_texture(get_theme_icon(SNAME("MaterialPreviewCubeOff"), SNAME("EditorIcons")));
+			box_switch->set_pressed_texture(get_theme_icon(SNAME("MaterialPreviewCube"), SNAME("EditorIcons")));
 
 			first_enter = false;
 		}
 	}
 
 	if (p_what == NOTIFICATION_DRAW) {
-		Ref<Texture2D> checkerboard = get_theme_icon("Checkerboard", "EditorIcons");
+		Ref<Texture2D> checkerboard = get_theme_icon(SNAME("Checkerboard"), SNAME("EditorIcons"));
 		Size2 size = get_size();
 
 		draw_texture_rect(checkerboard, Rect2(Point2(), size), true);
@@ -265,19 +265,21 @@ Ref<Resource> StandardMaterial3DConversionPlugin::convert(const Ref<Resource> &p
 	List<PropertyInfo> params;
 	RS::get_singleton()->shader_get_param_list(mat->get_shader_rid(), &params);
 
-	for (List<PropertyInfo>::Element *E = params.front(); E; E = E->next()) {
+	for (const PropertyInfo &E : params) {
 		// Texture parameter has to be treated specially since StandardMaterial3D saved it
 		// as RID but ShaderMaterial needs Texture itself
-		Ref<Texture2D> texture = mat->get_texture_by_name(E->get().name);
+		Ref<Texture2D> texture = mat->get_texture_by_name(E.name);
 		if (texture.is_valid()) {
-			smat->set_shader_param(E->get().name, texture);
+			smat->set_shader_param(E.name, texture);
 		} else {
-			Variant value = RS::get_singleton()->material_get_param(mat->get_rid(), E->get().name);
-			smat->set_shader_param(E->get().name, value);
+			Variant value = RS::get_singleton()->material_get_param(mat->get_rid(), E.name);
+			smat->set_shader_param(E.name, value);
 		}
 	}
 
 	smat->set_render_priority(mat->get_render_priority());
+	smat->set_local_to_scene(mat->is_local_to_scene());
+	smat->set_name(mat->get_name());
 	return smat;
 }
 
@@ -309,12 +311,14 @@ Ref<Resource> ParticlesMaterialConversionPlugin::convert(const Ref<Resource> &p_
 	List<PropertyInfo> params;
 	RS::get_singleton()->shader_get_param_list(mat->get_shader_rid(), &params);
 
-	for (List<PropertyInfo>::Element *E = params.front(); E; E = E->next()) {
-		Variant value = RS::get_singleton()->material_get_param(mat->get_rid(), E->get().name);
-		smat->set_shader_param(E->get().name, value);
+	for (const PropertyInfo &E : params) {
+		Variant value = RS::get_singleton()->material_get_param(mat->get_rid(), E.name);
+		smat->set_shader_param(E.name, value);
 	}
 
 	smat->set_render_priority(mat->get_render_priority());
+	smat->set_local_to_scene(mat->is_local_to_scene());
+	smat->set_name(mat->get_name());
 	return smat;
 }
 
@@ -346,12 +350,14 @@ Ref<Resource> CanvasItemMaterialConversionPlugin::convert(const Ref<Resource> &p
 	List<PropertyInfo> params;
 	RS::get_singleton()->shader_get_param_list(mat->get_shader_rid(), &params);
 
-	for (List<PropertyInfo>::Element *E = params.front(); E; E = E->next()) {
-		Variant value = RS::get_singleton()->material_get_param(mat->get_rid(), E->get().name);
-		smat->set_shader_param(E->get().name, value);
+	for (const PropertyInfo &E : params) {
+		Variant value = RS::get_singleton()->material_get_param(mat->get_rid(), E.name);
+		smat->set_shader_param(E.name, value);
 	}
 
 	smat->set_render_priority(mat->get_render_priority());
+	smat->set_local_to_scene(mat->is_local_to_scene());
+	smat->set_name(mat->get_name());
 	return smat;
 }
 
@@ -383,12 +389,14 @@ Ref<Resource> ProceduralSkyMaterialConversionPlugin::convert(const Ref<Resource>
 	List<PropertyInfo> params;
 	RS::get_singleton()->shader_get_param_list(mat->get_shader_rid(), &params);
 
-	for (List<PropertyInfo>::Element *E = params.front(); E; E = E->next()) {
-		Variant value = RS::get_singleton()->material_get_param(mat->get_rid(), E->get().name);
-		smat->set_shader_param(E->get().name, value);
+	for (const PropertyInfo &E : params) {
+		Variant value = RS::get_singleton()->material_get_param(mat->get_rid(), E.name);
+		smat->set_shader_param(E.name, value);
 	}
 
 	smat->set_render_priority(mat->get_render_priority());
+	smat->set_local_to_scene(mat->is_local_to_scene());
+	smat->set_name(mat->get_name());
 	return smat;
 }
 
@@ -420,12 +428,14 @@ Ref<Resource> PanoramaSkyMaterialConversionPlugin::convert(const Ref<Resource> &
 	List<PropertyInfo> params;
 	RS::get_singleton()->shader_get_param_list(mat->get_shader_rid(), &params);
 
-	for (List<PropertyInfo>::Element *E = params.front(); E; E = E->next()) {
-		Variant value = RS::get_singleton()->material_get_param(mat->get_rid(), E->get().name);
-		smat->set_shader_param(E->get().name, value);
+	for (const PropertyInfo &E : params) {
+		Variant value = RS::get_singleton()->material_get_param(mat->get_rid(), E.name);
+		smat->set_shader_param(E.name, value);
 	}
 
 	smat->set_render_priority(mat->get_render_priority());
+	smat->set_local_to_scene(mat->is_local_to_scene());
+	smat->set_name(mat->get_name());
 	return smat;
 }
 
@@ -457,11 +467,13 @@ Ref<Resource> PhysicalSkyMaterialConversionPlugin::convert(const Ref<Resource> &
 	List<PropertyInfo> params;
 	RS::get_singleton()->shader_get_param_list(mat->get_shader_rid(), &params);
 
-	for (List<PropertyInfo>::Element *E = params.front(); E; E = E->next()) {
-		Variant value = RS::get_singleton()->material_get_param(mat->get_rid(), E->get().name);
-		smat->set_shader_param(E->get().name, value);
+	for (const PropertyInfo &E : params) {
+		Variant value = RS::get_singleton()->material_get_param(mat->get_rid(), E.name);
+		smat->set_shader_param(E.name, value);
 	}
 
 	smat->set_render_priority(mat->get_render_priority());
+	smat->set_local_to_scene(mat->is_local_to_scene());
+	smat->set_name(mat->get_name());
 	return smat;
 }

@@ -49,7 +49,6 @@ void XRServer::_bind_methods() {
 	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "world_scale"), "set_world_scale", "get_world_scale");
 
 	ClassDB::bind_method(D_METHOD("add_interface", "interface"), &XRServer::add_interface);
-	ClassDB::bind_method(D_METHOD("clear_primary_interface_if", "interface"), &XRServer::clear_primary_interface_if);
 	ClassDB::bind_method(D_METHOD("get_interface_count"), &XRServer::get_interface_count);
 	ClassDB::bind_method(D_METHOD("remove_interface", "interface"), &XRServer::remove_interface);
 	ClassDB::bind_method(D_METHOD("get_interface", "idx"), &XRServer::get_interface);
@@ -87,11 +86,11 @@ void XRServer::_bind_methods() {
 	ADD_SIGNAL(MethodInfo("tracker_removed", PropertyInfo(Variant::STRING_NAME, "tracker_name"), PropertyInfo(Variant::INT, "type"), PropertyInfo(Variant::INT, "id")));
 };
 
-real_t XRServer::get_world_scale() const {
+double XRServer::get_world_scale() const {
 	return world_scale;
 };
 
-void XRServer::set_world_scale(real_t p_world_scale) {
+void XRServer::set_world_scale(double p_world_scale) {
 	if (p_world_scale < 0.01) {
 		p_world_scale = 0.01;
 	} else if (p_world_scale > 1000.0) {
@@ -164,7 +163,7 @@ void XRServer::add_interface(const Ref<XRInterface> &p_interface) {
 	};
 
 	interfaces.push_back(p_interface);
-	emit_signal("interface_added", p_interface->get_name());
+	emit_signal(SNAME("interface_added"), p_interface->get_name());
 };
 
 void XRServer::remove_interface(const Ref<XRInterface> &p_interface) {
@@ -182,7 +181,7 @@ void XRServer::remove_interface(const Ref<XRInterface> &p_interface) {
 
 	print_verbose("XR: Removed interface" + p_interface->get_name());
 
-	emit_signal("interface_removed", p_interface->get_name());
+	emit_signal(SNAME("interface_removed"), p_interface->get_name());
 	interfaces.remove(idx);
 };
 
@@ -269,7 +268,7 @@ void XRServer::add_tracker(Ref<XRPositionalTracker> p_tracker) {
 	ERR_FAIL_COND(p_tracker.is_null());
 
 	trackers.push_back(p_tracker);
-	emit_signal("tracker_added", p_tracker->get_tracker_name(), p_tracker->get_tracker_type(), p_tracker->get_tracker_id());
+	emit_signal(SNAME("tracker_added"), p_tracker->get_tracker_name(), p_tracker->get_tracker_type(), p_tracker->get_tracker_id());
 };
 
 void XRServer::remove_tracker(Ref<XRPositionalTracker> p_tracker) {
@@ -285,7 +284,7 @@ void XRServer::remove_tracker(Ref<XRPositionalTracker> p_tracker) {
 
 	ERR_FAIL_COND(idx == -1);
 
-	emit_signal("tracker_removed", p_tracker->get_tracker_name(), p_tracker->get_tracker_type(), p_tracker->get_tracker_id());
+	emit_signal(SNAME("tracker_removed"), p_tracker->get_tracker_name(), p_tracker->get_tracker_type(), p_tracker->get_tracker_id());
 	trackers.remove(idx);
 };
 
@@ -316,17 +315,14 @@ Ref<XRInterface> XRServer::get_primary_interface() const {
 };
 
 void XRServer::set_primary_interface(const Ref<XRInterface> &p_primary_interface) {
-	ERR_FAIL_COND(p_primary_interface.is_null());
-	primary_interface = p_primary_interface;
-
-	print_verbose("XR: Primary interface set to: " + primary_interface->get_name());
-};
-
-void XRServer::clear_primary_interface_if(const Ref<XRInterface> &p_primary_interface) {
-	if (primary_interface == p_primary_interface) {
+	if (p_primary_interface.is_null()) {
 		print_verbose("XR: Clearing primary interface");
 		primary_interface.unref();
-	};
+	} else {
+		primary_interface = p_primary_interface;
+
+		print_verbose("XR: Primary interface set to: " + primary_interface->get_name());
+	}
 };
 
 uint64_t XRServer::get_last_process_usec() {

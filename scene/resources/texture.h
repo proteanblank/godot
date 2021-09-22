@@ -98,8 +98,6 @@ protected:
 	bool _get(const StringName &p_name, Variant &r_ret) const;
 	void _get_property_list(List<PropertyInfo> *p_list) const;
 
-	void _reload_hook(const RID &p_hook);
-	virtual void _resource_path_changed() override;
 	static void _bind_methods();
 
 public:
@@ -686,6 +684,7 @@ private:
 	bool update_pending = false;
 	RID texture;
 	int width = 2048;
+	bool use_hdr = false;
 
 	void _queue_update();
 	void _update();
@@ -699,6 +698,9 @@ public:
 
 	void set_width(int p_width);
 	int get_width() const override;
+
+	void set_use_hdr(bool p_enabled);
+	bool is_using_hdr() const;
 
 	virtual RID get_rid() const override { return texture; }
 	virtual int get_height() const override { return 1; }
@@ -812,6 +814,7 @@ class CameraTexture : public Texture2D {
 	GDCLASS(CameraTexture, Texture2D);
 
 private:
+	mutable RID _texture;
 	int camera_feed_id = 0;
 	CameraServer::FeedImage which_feed = CameraServer::FEED_RGBA_IMAGE;
 

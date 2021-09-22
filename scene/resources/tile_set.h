@@ -79,15 +79,15 @@ private:
 		Vector2 tex_offset;
 		Ref<ShaderMaterial> material;
 		Rect2 region;
-		int tile_mode;
-		Color modulate;
+		int tile_mode = 0;
+		Color modulate = Color(1, 1, 1);
 
 		// Atlas or autotiles data
-		int autotile_bitmask_mode;
+		int autotile_bitmask_mode = 0;
 		Vector2 autotile_icon_coordinate;
 		Size2i autotile_tile_size = Size2i(16, 16);
 
-		int autotile_spacing;
+		int autotile_spacing = 0;
 		Map<Vector2i, int> autotile_bitmask_flags;
 		Map<Vector2i, Ref<OccluderPolygon2D>> autotile_occluder_map;
 		Map<Vector2i, Ref<NavigationPolygon>> autotile_navpoly_map;
@@ -99,23 +99,29 @@ private:
 		Vector2 occluder_offset;
 		Ref<NavigationPolygon> navigation;
 		Vector2 navigation_offset;
-		int z_index;
+		int z_index = 0;
 	};
 
-	Map<int, CompatibilityTileData *> compatibility_data = Map<int, CompatibilityTileData *>();
-	Map<int, int> compatibility_source_mapping = Map<int, int>();
+	enum CompatibilityTileMode {
+		COMPATIBILITY_TILE_MODE_SINGLE_TILE = 0,
+		COMPATIBILITY_TILE_MODE_AUTO_TILE,
+		COMPATIBILITY_TILE_MODE_ATLAS_TILE,
+	};
 
-private:
-	void compatibility_conversion();
+	Map<int, CompatibilityTileData *> compatibility_data;
+	Map<int, int> compatibility_tilemap_mapping_tile_modes;
+	Map<int, Map<Array, Array>> compatibility_tilemap_mapping;
+
+	void _compatibility_conversion();
 
 public:
-	int compatibility_get_source_for_tile_id(int p_old_source) {
-		return compatibility_source_mapping[p_old_source];
-	};
-
+	// Format of output array [source_id, atlas_coords, alternative]
+	Array compatibility_tilemap_map(int p_tile_id, Vector2i p_coords, bool p_flip_h, bool p_flip_v, bool p_transpose);
 #endif // DISABLE_DEPRECATED
 
 public:
+	static const int INVALID_SOURCE; // -1;
+
 	enum CellNeighbor {
 		CELL_NEIGHBOR_RIGHT_SIDE = 0,
 		CELL_NEIGHBOR_RIGHT_CORNER,
@@ -165,7 +171,6 @@ public:
 		TILE_OFFSET_AXIS_VERTICAL,
 	};
 
-public:
 	struct PackedSceneSource {
 		Ref<PackedScene> scene;
 		Vector2 offset;
@@ -186,7 +191,6 @@ private:
 	Vector2 tile_skew = Vector2(0, 0);
 
 	// Rendering.
-	bool y_sorting = false;
 	bool uv_clipping = false;
 	struct OcclusionLayer {
 		uint32_t light_mask = 1;
@@ -221,10 +225,10 @@ private:
 	bool terrain_bits_meshes_dirty = true;
 
 	// Navigation
-	struct Navigationlayer {
+	struct NavigationLayer {
 		uint32_t layers = 1;
 	};
-	Vector<Navigationlayer> navigation_layers;
+	Vector<NavigationLayer> navigation_layers;
 
 	// CustomData
 	struct CustomDataLayer {
@@ -240,11 +244,13 @@ private:
 	int next_source_id = 0;
 	// ---------------------
 
-	// Plugins themselves.
-	Vector<TileSetPlugin *> tile_set_plugins_vector;
-
 	void _compute_next_source_id();
 	void _source_changed();
+
+	// Tile proxies
+	Map<int, int> source_level_proxies;
+	Map<Array, Array> coords_level_proxies;
+	Map<Array, Array> alternative_level_proxies;
 
 	// Helpers
 	Vector<Point2> _get_square_corner_or_side_terrain_bit_polygon(Vector2i p_size, TileSet::CellNeighbor p_bit);
@@ -289,22 +295,23 @@ public:
 	Ref<TileSetSource> get_source(int p_source_id) const;
 
 	// Rendering
-	void set_y_sorting(bool p_y_sort);
-	bool is_y_sorting() const;
-
 	void set_uv_clipping(bool p_uv_clipping);
 	bool is_uv_clipping() const;
 
-	void set_occlusion_layers_count(int p_occlusion_layers_count);
 	int get_occlusion_layers_count() const;
+	void add_occlusion_layer(int p_index = -1);
+	void move_occlusion_layer(int p_from_index, int p_to_pos);
+	void remove_occlusion_layer(int p_index);
 	void set_occlusion_layer_light_mask(int p_layer_index, int p_light_mask);
 	int get_occlusion_layer_light_mask(int p_layer_index) const;
-	void set_occlusion_layer_sdf_collision(int p_layer_index, int p_sdf_collision);
+	void set_occlusion_layer_sdf_collision(int p_layer_index, bool p_sdf_collision);
 	bool get_occlusion_layer_sdf_collision(int p_layer_index) const;
 
 	// Physics
-	void set_physics_layers_count(int p_physics_layers_count);
 	int get_physics_layers_count() const;
+	void add_physics_layer(int p_index = -1);
+	void move_physics_layer(int p_from_index, int p_to_pos);
+	void remove_physics_layer(int p_index);
 	void set_physics_layer_collision_layer(int p_layer_index, uint32_t p_layer);
 	uint32_t get_physics_layer_collision_layer(int p_layer_index) const;
 	void set_physics_layer_collision_mask(int p_layer_index, uint32_t p_mask);
@@ -312,13 +319,19 @@ public:
 	void set_physics_layer_physics_material(int p_layer_index, Ref<PhysicsMaterial> p_physics_material);
 	Ref<PhysicsMaterial> get_physics_layer_physics_material(int p_layer_index) const;
 
-	// Terrains
-	void set_terrain_sets_count(int p_terrains_sets_count);
+	// Terrain sets
 	int get_terrain_sets_count() const;
+	void add_terrain_set(int p_index = -1);
+	void move_terrain_set(int p_from_index, int p_to_pos);
+	void remove_terrain_set(int p_index);
 	void set_terrain_set_mode(int p_terrain_set, TerrainMode p_terrain_mode);
 	TerrainMode get_terrain_set_mode(int p_terrain_set) const;
-	void set_terrains_count(int p_terrain_set, int p_terrains_count);
+
+	// Terrains
 	int get_terrains_count(int p_terrain_set) const;
+	void add_terrain(int p_terrain_set, int p_index = -1);
+	void move_terrain(int p_terrain_set, int p_from_index, int p_to_pos);
+	void remove_terrain(int p_terrain_set, int p_index);
 	void set_terrain_name(int p_terrain_set, int p_terrain_index, String p_name);
 	String get_terrain_name(int p_terrain_set, int p_terrain_index) const;
 	void set_terrain_color(int p_terrain_set, int p_terrain_index, Color p_color);
@@ -327,23 +340,52 @@ public:
 	bool is_valid_peering_bit_terrain(int p_terrain_set, TileSet::CellNeighbor p_peering_bit) const;
 
 	// Navigation
-	void set_navigation_layers_count(int p_navigation_layers_count);
 	int get_navigation_layers_count() const;
+	void add_navigation_layer(int p_index = -1);
+	void move_navigation_layer(int p_from_index, int p_to_pos);
+	void remove_navigation_layer(int p_index);
 	void set_navigation_layer_layers(int p_layer_index, uint32_t p_layers);
 	uint32_t get_navigation_layer_layers(int p_layer_index) const;
 
 	// Custom data
-	void set_custom_data_layers_count(int p_custom_data_layers_count);
 	int get_custom_data_layers_count() const;
+	void add_custom_data_layer(int p_index = -1);
+	void move_custom_data_layer(int p_from_index, int p_to_pos);
+	void remove_custom_data_layer(int p_index);
 	int get_custom_data_layer_by_name(String p_value) const;
 	void set_custom_data_name(int p_layer_id, String p_value);
 	String get_custom_data_name(int p_layer_id) const;
 	void set_custom_data_type(int p_layer_id, Variant::Type p_value);
 	Variant::Type get_custom_data_type(int p_layer_id) const;
 
+	// Tiles proxies.
+	void set_source_level_tile_proxy(int p_source_from, int p_source_to);
+	int get_source_level_tile_proxy(int p_source_from);
+	bool has_source_level_tile_proxy(int p_source_from);
+	void remove_source_level_tile_proxy(int p_source_from);
+
+	void set_coords_level_tile_proxy(int p_source_from, Vector2i p_coords_from, int p_source_to, Vector2i p_coords_to);
+	Array get_coords_level_tile_proxy(int p_source_from, Vector2i p_coords_from);
+	bool has_coords_level_tile_proxy(int p_source_from, Vector2i p_coords_from);
+	void remove_coords_level_tile_proxy(int p_source_from, Vector2i p_coords_from);
+
+	void set_alternative_level_tile_proxy(int p_source_from, Vector2i p_coords_from, int p_alternative_from, int p_source_to, Vector2i p_coords_to, int p_alternative_to);
+	Array get_alternative_level_tile_proxy(int p_source_from, Vector2i p_coords_from, int p_alternative_from);
+	bool has_alternative_level_tile_proxy(int p_source_from, Vector2i p_coords_from, int p_alternative_from);
+	void remove_alternative_level_tile_proxy(int p_source_from, Vector2i p_coords_from, int p_alternative_from);
+
+	Array get_source_level_tile_proxies() const;
+	Array get_coords_level_tile_proxies() const;
+	Array get_alternative_level_tile_proxies() const;
+
+	Array map_tile_proxy(int p_source_from, Vector2i p_coords_from, int p_alternative_from) const;
+
+	void cleanup_invalid_tile_proxies();
+	void clear_tile_proxies();
+
 	// Helpers
 	Vector<Vector2> get_tile_shape_polygon();
-	void draw_tile_shape(CanvasItem *p_canvas_item, Rect2 p_region, Color p_color, bool p_filled = false, Ref<Texture2D> p_texture = Ref<Texture2D>());
+	void draw_tile_shape(CanvasItem *p_canvas_item, Transform2D p_transform, Color p_color, bool p_filled = false, Ref<Texture2D> p_texture = Ref<Texture2D>());
 
 	Vector<Point2> get_terrain_bit_polygon(int p_terrain_set, TileSet::CellNeighbor p_bit);
 	void draw_terrains(CanvasItem *p_canvas_item, Transform2D p_transform, const TileData *p_tile_data);
@@ -362,6 +404,8 @@ class TileSetSource : public Resource {
 protected:
 	const TileSet *tile_set = nullptr;
 
+	static void _bind_methods();
+
 public:
 	static const Vector2i INVALID_ATLAS_COORDS; // Vector2i(-1, -1);
 	static const int INVALID_TILE_ALTERNATIVE; // -1;
@@ -369,6 +413,24 @@ public:
 	// Not exposed.
 	virtual void set_tile_set(const TileSet *p_tile_set);
 	virtual void notify_tile_data_properties_should_change(){};
+	virtual void add_occlusion_layer(int p_index){};
+	virtual void move_occlusion_layer(int p_from_index, int p_to_pos){};
+	virtual void remove_occlusion_layer(int p_index){};
+	virtual void add_physics_layer(int p_index){};
+	virtual void move_physics_layer(int p_from_index, int p_to_pos){};
+	virtual void remove_physics_layer(int p_index){};
+	virtual void add_terrain_set(int p_index){};
+	virtual void move_terrain_set(int p_from_index, int p_to_pos){};
+	virtual void remove_terrain_set(int p_index){};
+	virtual void add_terrain(int p_terrain_set, int p_index){};
+	virtual void move_terrain(int p_terrain_set, int p_from_index, int p_to_pos){};
+	virtual void remove_terrain(int p_terrain_set, int p_index){};
+	virtual void add_navigation_layer(int p_index){};
+	virtual void move_navigation_layer(int p_from_index, int p_to_pos){};
+	virtual void remove_navigation_layer(int p_index){};
+	virtual void add_custom_data_layer(int p_index){};
+	virtual void move_custom_data_layer(int p_from_index, int p_to_pos){};
+	virtual void remove_custom_data_layer(int p_index){};
 	virtual void reset_state() override{};
 
 	// Tiles.
@@ -420,6 +482,24 @@ public:
 	// Not exposed.
 	virtual void set_tile_set(const TileSet *p_tile_set) override;
 	virtual void notify_tile_data_properties_should_change() override;
+	virtual void add_occlusion_layer(int p_index) override;
+	virtual void move_occlusion_layer(int p_from_index, int p_to_pos) override;
+	virtual void remove_occlusion_layer(int p_index) override;
+	virtual void add_physics_layer(int p_index) override;
+	virtual void move_physics_layer(int p_from_index, int p_to_pos) override;
+	virtual void remove_physics_layer(int p_index) override;
+	virtual void add_terrain_set(int p_index) override;
+	virtual void move_terrain_set(int p_from_index, int p_to_pos) override;
+	virtual void remove_terrain_set(int p_index) override;
+	virtual void add_terrain(int p_terrain_set, int p_index) override;
+	virtual void move_terrain(int p_terrain_set, int p_from_index, int p_to_pos) override;
+	virtual void remove_terrain(int p_terrain_set, int p_index) override;
+	virtual void add_navigation_layer(int p_index) override;
+	virtual void move_navigation_layer(int p_from_index, int p_to_pos) override;
+	virtual void remove_navigation_layer(int p_index) override;
+	virtual void add_custom_data_layer(int p_index) override;
+	virtual void move_custom_data_layer(int p_from_index, int p_to_pos) override;
+	virtual void remove_custom_data_layer(int p_index) override;
 	virtual void reset_state() override;
 
 	// Base properties.
@@ -500,7 +580,7 @@ public:
 	int get_alternative_tile_id(const Vector2i p_atlas_coords, int p_index) const override;
 	bool has_alternative_tile(const Vector2i p_atlas_coords, int p_alternative_tile) const override;
 
-	// Scenes sccessors. Lot are similar to "Alternative tiles".
+	// Scenes accessors. Lot are similar to "Alternative tiles".
 	int get_scene_tiles_count() { return get_alternative_tiles_count(Vector2i()); }
 	int get_scene_tile_id(int p_index) { return get_alternative_tile_id(Vector2i(), p_index); };
 	bool has_scene_tile_id(int p_id) { return has_alternative_tile(Vector2i(), p_id); };
@@ -569,6 +649,24 @@ public:
 	// Not exposed.
 	void set_tile_set(const TileSet *p_tile_set);
 	void notify_tile_data_properties_should_change();
+	void add_occlusion_layer(int p_index);
+	void move_occlusion_layer(int p_from_index, int p_to_pos);
+	void remove_occlusion_layer(int p_index);
+	void add_physics_layer(int p_index);
+	void move_physics_layer(int p_from_index, int p_to_pos);
+	void remove_physics_layer(int p_index);
+	void add_terrain_set(int p_index);
+	void move_terrain_set(int p_from_index, int p_to_pos);
+	void remove_terrain_set(int p_index);
+	void add_terrain(int p_terrain_set, int p_index);
+	void move_terrain(int p_terrain_set, int p_from_index, int p_to_pos);
+	void remove_terrain(int p_terrain_set, int p_index);
+	void add_navigation_layer(int p_index);
+	void move_navigation_layer(int p_from_index, int p_to_pos);
+	void remove_navigation_layer(int p_index);
+	void add_custom_data_layer(int p_index);
+	void move_custom_data_layer(int p_from_index, int p_to_pos);
+	void remove_custom_data_layer(int p_index);
 	void reset_state();
 	void set_allow_transform(bool p_allow_transform);
 	bool is_allowing_transform() const;
@@ -583,8 +681,8 @@ public:
 
 	void set_texture_offset(Vector2i p_texture_offset);
 	Vector2i get_texture_offset() const;
-	void tile_set_material(Ref<ShaderMaterial> p_material);
-	Ref<ShaderMaterial> tile_get_material() const;
+	void set_material(Ref<ShaderMaterial> p_material);
+	Ref<ShaderMaterial> get_material() const;
 	void set_modulate(Color p_modulate);
 	Color get_modulate() const;
 	void set_z_index(int p_z_index);
@@ -629,73 +727,6 @@ public:
 	Variant get_custom_data(String p_layer_name) const;
 	void set_custom_data_by_layer_id(int p_layer_id, Variant p_value);
 	Variant get_custom_data_by_layer_id(int p_layer_id) const;
-};
-
-#include "scene/2d/tile_map.h"
-
-class TileSetPlugin : public Object {
-	GDCLASS(TileSetPlugin, Object);
-
-public:
-	// Tilemap updates.
-	virtual void tilemap_notification(TileMap *p_tile_map, int p_what){};
-	virtual void update_dirty_quadrants(TileMap *p_tile_map, SelfList<TileMapQuadrant>::List &r_dirty_quadrant_list){};
-	virtual void create_quadrant(TileMap *p_tile_map, TileMapQuadrant *p_quadrant){};
-	virtual void cleanup_quadrant(TileMap *p_tile_map, TileMapQuadrant *p_quadrant){};
-
-	virtual void draw_quadrant_debug(TileMap *p_tile_map, TileMapQuadrant *p_quadrant){};
-};
-
-class TileSetPluginAtlasRendering : public TileSetPlugin {
-	GDCLASS(TileSetPluginAtlasRendering, TileSetPlugin);
-
-private:
-	static constexpr float fp_adjust = 0.00001;
-	bool quadrant_order_dirty = false;
-
-public:
-	// Tilemap updates
-	virtual void tilemap_notification(TileMap *p_tile_map, int p_what) override;
-	virtual void update_dirty_quadrants(TileMap *p_tile_map, SelfList<TileMapQuadrant>::List &r_dirty_quadrant_list) override;
-	virtual void create_quadrant(TileMap *p_tile_map, TileMapQuadrant *p_quadrant) override;
-	virtual void cleanup_quadrant(TileMap *p_tile_map, TileMapQuadrant *p_quadrant) override;
-	virtual void draw_quadrant_debug(TileMap *p_tile_map, TileMapQuadrant *p_quadrant) override;
-
-	// Other.
-	static void draw_tile(RID p_canvas_item, Vector2i p_position, const Ref<TileSet> p_tile_set, int p_atlas_source_id, Vector2i p_atlas_coords, int p_alternative_tile, Color p_modulation = Color(1.0, 1.0, 1.0, 1.0));
-};
-
-class TileSetPluginAtlasPhysics : public TileSetPlugin {
-	GDCLASS(TileSetPluginAtlasPhysics, TileSetPlugin);
-
-public:
-	// Tilemap updates
-	virtual void tilemap_notification(TileMap *p_tile_map, int p_what) override;
-	virtual void update_dirty_quadrants(TileMap *p_tile_map, SelfList<TileMapQuadrant>::List &r_dirty_quadrant_list) override;
-	virtual void create_quadrant(TileMap *p_tile_map, TileMapQuadrant *p_quadrant) override;
-	virtual void cleanup_quadrant(TileMap *p_tile_map, TileMapQuadrant *p_quadrant) override;
-	virtual void draw_quadrant_debug(TileMap *p_tile_map, TileMapQuadrant *p_quadrant) override;
-};
-
-class TileSetPluginAtlasNavigation : public TileSetPlugin {
-	GDCLASS(TileSetPluginAtlasNavigation, TileSetPlugin);
-
-public:
-	// Tilemap updates
-	virtual void tilemap_notification(TileMap *p_tile_map, int p_what) override;
-	virtual void update_dirty_quadrants(TileMap *p_tile_map, SelfList<TileMapQuadrant>::List &r_dirty_quadrant_list) override;
-	virtual void cleanup_quadrant(TileMap *p_tile_map, TileMapQuadrant *p_quadrant) override;
-	virtual void draw_quadrant_debug(TileMap *p_tile_map, TileMapQuadrant *p_quadrant) override;
-};
-
-class TileSetPluginScenesCollections : public TileSetPlugin {
-	GDCLASS(TileSetPluginScenesCollections, TileSetPlugin);
-
-public:
-	// Tilemap updates
-	virtual void update_dirty_quadrants(TileMap *p_tile_map, SelfList<TileMapQuadrant>::List &r_dirty_quadrant_list) override;
-	virtual void cleanup_quadrant(TileMap *p_tile_map, TileMapQuadrant *p_quadrant) override;
-	virtual void draw_quadrant_debug(TileMap *p_tile_map, TileMapQuadrant *p_quadrant) override;
 };
 
 VARIANT_ENUM_CAST(TileSet::CellNeighbor);

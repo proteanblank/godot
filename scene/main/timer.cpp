@@ -30,8 +30,6 @@
 
 #include "timer.h"
 
-#include "core/config/engine.h"
-
 void Timer::_notification(int p_what) {
 	switch (p_what) {
 		case NOTIFICATION_READY: {
@@ -58,7 +56,7 @@ void Timer::_notification(int p_what) {
 					stop();
 				}
 
-				emit_signal("timeout");
+				emit_signal(SNAME("timeout"));
 			}
 
 		} break;
@@ -74,19 +72,19 @@ void Timer::_notification(int p_what) {
 				} else {
 					stop();
 				}
-				emit_signal("timeout");
+				emit_signal(SNAME("timeout"));
 			}
 
 		} break;
 	}
 }
 
-void Timer::set_wait_time(float p_time) {
+void Timer::set_wait_time(double p_time) {
 	ERR_FAIL_COND_MSG(p_time <= 0, "Time should be greater than zero.");
 	wait_time = p_time;
 }
 
-float Timer::get_wait_time() const {
+double Timer::get_wait_time() const {
 	return wait_time;
 }
 
@@ -106,7 +104,7 @@ bool Timer::has_autostart() const {
 	return autostart;
 }
 
-void Timer::start(float p_time) {
+void Timer::start(double p_time) {
 	ERR_FAIL_COND_MSG(!is_inside_tree(), "Timer was not added to the SceneTree. Either add it or set autostart to true.");
 
 	if (p_time > 0) {
@@ -139,7 +137,7 @@ bool Timer::is_stopped() const {
 	return get_time_left() <= 0;
 }
 
-float Timer::get_time_left() const {
+double Timer::get_time_left() const {
 	return time_left > 0 ? time_left : 0;
 }
 

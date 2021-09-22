@@ -912,6 +912,8 @@ void ShaderLanguage::clear() {
 	completion_class = SubClassTag::TAG_GLOBAL;
 	completion_struct = StringName();
 
+	unknown_varying_usages.clear();
+
 #ifdef DEBUG_ENABLED
 	used_constants.clear();
 	used_varyings.clear();
@@ -946,7 +948,9 @@ void ShaderLanguage::_parse_used_identifier(const StringName &p_identifier, Iden
 			break;
 		case IdentifierType::IDENTIFIER_VARYING:
 			if (HAS_WARNING(ShaderWarning::UNUSED_VARYING_FLAG) && used_varyings.has(p_identifier)) {
-				used_varyings[p_identifier].used = true;
+				if (shader->varyings[p_identifier].stage != ShaderNode::Varying::STAGE_VERTEX && shader->varyings[p_identifier].stage != ShaderNode::Varying::STAGE_FRAGMENT) {
+					used_varyings[p_identifier].used = true;
+				}
 			}
 			break;
 		case IdentifierType::IDENTIFIER_UNIFORM:
@@ -1420,7 +1424,7 @@ bool ShaderLanguage::_validate_operator(OperatorNode *p_op, DataType *r_ret_type
 			DataType nb = p_op->arguments[1]->get_datatype();
 
 			if (na == nb) {
-				valid = (na > TYPE_BOOL && na < TYPE_MAT2) || (p_op->op == OP_ASSIGN_MUL && na >= TYPE_MAT2 && na <= TYPE_MAT4);
+				valid = (na > TYPE_BOOL && na <= TYPE_MAT4);
 				ret_type = na;
 			} else if (na == TYPE_IVEC2 && nb == TYPE_INT) {
 				valid = true;
@@ -1594,723 +1598,723 @@ bool ShaderLanguage::_validate_operator(OperatorNode *p_op, DataType *r_ret_type
 
 const ShaderLanguage::BuiltinFuncDef ShaderLanguage::builtin_func_defs[] = {
 	//constructors
-	{ "bool", TYPE_BOOL, { TYPE_BOOL, TYPE_VOID }, TAG_GLOBAL, false },
-	{ "bvec2", TYPE_BVEC2, { TYPE_BOOL, TYPE_VOID }, TAG_GLOBAL, false },
-	{ "bvec2", TYPE_BVEC2, { TYPE_BOOL, TYPE_BOOL, TYPE_VOID }, TAG_GLOBAL, false },
-	{ "bvec3", TYPE_BVEC3, { TYPE_BOOL, TYPE_VOID }, TAG_GLOBAL, false },
-	{ "bvec3", TYPE_BVEC3, { TYPE_BOOL, TYPE_BOOL, TYPE_BOOL, TYPE_VOID }, TAG_GLOBAL, false },
-	{ "bvec3", TYPE_BVEC3, { TYPE_BVEC2, TYPE_BOOL, TYPE_VOID }, TAG_GLOBAL, false },
-	{ "bvec3", TYPE_BVEC3, { TYPE_BOOL, TYPE_BVEC2, TYPE_VOID }, TAG_GLOBAL, false },
-	{ "bvec4", TYPE_BVEC4, { TYPE_BOOL, TYPE_VOID }, TAG_GLOBAL, false },
-	{ "bvec4", TYPE_BVEC4, { TYPE_BOOL, TYPE_BOOL, TYPE_BOOL, TYPE_BOOL, TYPE_VOID }, TAG_GLOBAL, false },
-	{ "bvec4", TYPE_BVEC4, { TYPE_BOOL, TYPE_BVEC2, TYPE_BOOL, TYPE_VOID }, TAG_GLOBAL, false },
-	{ "bvec4", TYPE_BVEC4, { TYPE_BVEC2, TYPE_BOOL, TYPE_BOOL, TYPE_VOID }, TAG_GLOBAL, false },
-	{ "bvec4", TYPE_BVEC4, { TYPE_BOOL, TYPE_BOOL, TYPE_BVEC2, TYPE_VOID }, TAG_GLOBAL, false },
-	{ "bvec4", TYPE_BVEC4, { TYPE_BOOL, TYPE_BVEC3, TYPE_VOID }, TAG_GLOBAL, false },
-	{ "bvec4", TYPE_BVEC4, { TYPE_BVEC3, TYPE_BOOL, TYPE_VOID }, TAG_GLOBAL, false },
-	{ "bvec4", TYPE_BVEC4, { TYPE_BVEC2, TYPE_BVEC2, TYPE_VOID }, TAG_GLOBAL, false },
+	{ "bool", TYPE_BOOL, { TYPE_BOOL, TYPE_VOID }, { "" }, TAG_GLOBAL, false },
+	{ "bvec2", TYPE_BVEC2, { TYPE_BOOL, TYPE_VOID }, { "" }, TAG_GLOBAL, false },
+	{ "bvec2", TYPE_BVEC2, { TYPE_BOOL, TYPE_BOOL, TYPE_VOID }, { "" }, TAG_GLOBAL, false },
+	{ "bvec3", TYPE_BVEC3, { TYPE_BOOL, TYPE_VOID }, { "" }, TAG_GLOBAL, false },
+	{ "bvec3", TYPE_BVEC3, { TYPE_BOOL, TYPE_BOOL, TYPE_BOOL, TYPE_VOID }, { "" }, TAG_GLOBAL, false },
+	{ "bvec3", TYPE_BVEC3, { TYPE_BVEC2, TYPE_BOOL, TYPE_VOID }, { "" }, TAG_GLOBAL, false },
+	{ "bvec3", TYPE_BVEC3, { TYPE_BOOL, TYPE_BVEC2, TYPE_VOID }, { "" }, TAG_GLOBAL, false },
+	{ "bvec4", TYPE_BVEC4, { TYPE_BOOL, TYPE_VOID }, { "" }, TAG_GLOBAL, false },
+	{ "bvec4", TYPE_BVEC4, { TYPE_BOOL, TYPE_BOOL, TYPE_BOOL, TYPE_BOOL, TYPE_VOID }, { "" }, TAG_GLOBAL, false },
+	{ "bvec4", TYPE_BVEC4, { TYPE_BOOL, TYPE_BVEC2, TYPE_BOOL, TYPE_VOID }, { "" }, TAG_GLOBAL, false },
+	{ "bvec4", TYPE_BVEC4, { TYPE_BVEC2, TYPE_BOOL, TYPE_BOOL, TYPE_VOID }, { "" }, TAG_GLOBAL, false },
+	{ "bvec4", TYPE_BVEC4, { TYPE_BOOL, TYPE_BOOL, TYPE_BVEC2, TYPE_VOID }, { "" }, TAG_GLOBAL, false },
+	{ "bvec4", TYPE_BVEC4, { TYPE_BOOL, TYPE_BVEC3, TYPE_VOID }, { "" }, TAG_GLOBAL, false },
+	{ "bvec4", TYPE_BVEC4, { TYPE_BVEC3, TYPE_BOOL, TYPE_VOID }, { "" }, TAG_GLOBAL, false },
+	{ "bvec4", TYPE_BVEC4, { TYPE_BVEC2, TYPE_BVEC2, TYPE_VOID }, { "" }, TAG_GLOBAL, false },
 
-	{ "float", TYPE_FLOAT, { TYPE_FLOAT, TYPE_VOID }, TAG_GLOBAL, false },
-	{ "vec2", TYPE_VEC2, { TYPE_FLOAT, TYPE_VOID }, TAG_GLOBAL, false },
-	{ "vec2", TYPE_VEC2, { TYPE_FLOAT, TYPE_FLOAT, TYPE_VOID }, TAG_GLOBAL, false },
-	{ "vec3", TYPE_VEC3, { TYPE_FLOAT, TYPE_VOID }, TAG_GLOBAL, false },
-	{ "vec3", TYPE_VEC3, { TYPE_FLOAT, TYPE_FLOAT, TYPE_FLOAT, TYPE_VOID }, TAG_GLOBAL, false },
-	{ "vec3", TYPE_VEC3, { TYPE_VEC2, TYPE_FLOAT, TYPE_VOID }, TAG_GLOBAL, false },
-	{ "vec3", TYPE_VEC3, { TYPE_FLOAT, TYPE_VEC2, TYPE_VOID }, TAG_GLOBAL, false },
-	{ "vec4", TYPE_VEC4, { TYPE_FLOAT, TYPE_VOID }, TAG_GLOBAL, false },
-	{ "vec4", TYPE_VEC4, { TYPE_FLOAT, TYPE_FLOAT, TYPE_FLOAT, TYPE_FLOAT, TYPE_VOID }, TAG_GLOBAL, false },
-	{ "vec4", TYPE_VEC4, { TYPE_FLOAT, TYPE_VEC2, TYPE_FLOAT, TYPE_VOID }, TAG_GLOBAL, false },
-	{ "vec4", TYPE_VEC4, { TYPE_VEC2, TYPE_FLOAT, TYPE_FLOAT, TYPE_VOID }, TAG_GLOBAL, false },
-	{ "vec4", TYPE_VEC4, { TYPE_FLOAT, TYPE_FLOAT, TYPE_VEC2, TYPE_VOID }, TAG_GLOBAL, false },
-	{ "vec4", TYPE_VEC4, { TYPE_FLOAT, TYPE_VEC3, TYPE_VOID }, TAG_GLOBAL, false },
-	{ "vec4", TYPE_VEC4, { TYPE_VEC3, TYPE_FLOAT, TYPE_VOID }, TAG_GLOBAL, false },
-	{ "vec4", TYPE_VEC4, { TYPE_VEC2, TYPE_VEC2, TYPE_VOID }, TAG_GLOBAL, false },
+	{ "float", TYPE_FLOAT, { TYPE_FLOAT, TYPE_VOID }, { "" }, TAG_GLOBAL, false },
+	{ "vec2", TYPE_VEC2, { TYPE_FLOAT, TYPE_VOID }, { "" }, TAG_GLOBAL, false },
+	{ "vec2", TYPE_VEC2, { TYPE_FLOAT, TYPE_FLOAT, TYPE_VOID }, { "" }, TAG_GLOBAL, false },
+	{ "vec3", TYPE_VEC3, { TYPE_FLOAT, TYPE_VOID }, { "" }, TAG_GLOBAL, false },
+	{ "vec3", TYPE_VEC3, { TYPE_FLOAT, TYPE_FLOAT, TYPE_FLOAT, TYPE_VOID }, { "" }, TAG_GLOBAL, false },
+	{ "vec3", TYPE_VEC3, { TYPE_VEC2, TYPE_FLOAT, TYPE_VOID }, { "" }, TAG_GLOBAL, false },
+	{ "vec3", TYPE_VEC3, { TYPE_FLOAT, TYPE_VEC2, TYPE_VOID }, { "" }, TAG_GLOBAL, false },
+	{ "vec4", TYPE_VEC4, { TYPE_FLOAT, TYPE_VOID }, { "" }, TAG_GLOBAL, false },
+	{ "vec4", TYPE_VEC4, { TYPE_FLOAT, TYPE_FLOAT, TYPE_FLOAT, TYPE_FLOAT, TYPE_VOID }, { "" }, TAG_GLOBAL, false },
+	{ "vec4", TYPE_VEC4, { TYPE_FLOAT, TYPE_VEC2, TYPE_FLOAT, TYPE_VOID }, { "" }, TAG_GLOBAL, false },
+	{ "vec4", TYPE_VEC4, { TYPE_VEC2, TYPE_FLOAT, TYPE_FLOAT, TYPE_VOID }, { "" }, TAG_GLOBAL, false },
+	{ "vec4", TYPE_VEC4, { TYPE_FLOAT, TYPE_FLOAT, TYPE_VEC2, TYPE_VOID }, { "" }, TAG_GLOBAL, false },
+	{ "vec4", TYPE_VEC4, { TYPE_FLOAT, TYPE_VEC3, TYPE_VOID }, { "" }, TAG_GLOBAL, false },
+	{ "vec4", TYPE_VEC4, { TYPE_VEC3, TYPE_FLOAT, TYPE_VOID }, { "" }, TAG_GLOBAL, false },
+	{ "vec4", TYPE_VEC4, { TYPE_VEC2, TYPE_VEC2, TYPE_VOID }, { "" }, TAG_GLOBAL, false },
 
-	{ "int", TYPE_INT, { TYPE_INT, TYPE_VOID }, TAG_GLOBAL, false },
-	{ "ivec2", TYPE_IVEC2, { TYPE_INT, TYPE_VOID }, TAG_GLOBAL, false },
-	{ "ivec2", TYPE_IVEC2, { TYPE_INT, TYPE_INT, TYPE_VOID }, TAG_GLOBAL, false },
-	{ "ivec3", TYPE_IVEC3, { TYPE_INT, TYPE_VOID }, TAG_GLOBAL, false },
-	{ "ivec3", TYPE_IVEC3, { TYPE_INT, TYPE_INT, TYPE_INT, TYPE_VOID }, TAG_GLOBAL, false },
-	{ "ivec3", TYPE_IVEC3, { TYPE_IVEC2, TYPE_INT, TYPE_VOID }, TAG_GLOBAL, false },
-	{ "ivec3", TYPE_IVEC3, { TYPE_INT, TYPE_IVEC2, TYPE_VOID }, TAG_GLOBAL, false },
-	{ "ivec4", TYPE_IVEC4, { TYPE_INT, TYPE_VOID }, TAG_GLOBAL, false },
-	{ "ivec4", TYPE_IVEC4, { TYPE_INT, TYPE_INT, TYPE_INT, TYPE_INT, TYPE_VOID }, TAG_GLOBAL, false },
-	{ "ivec4", TYPE_IVEC4, { TYPE_INT, TYPE_IVEC2, TYPE_INT, TYPE_VOID }, TAG_GLOBAL, false },
-	{ "ivec4", TYPE_IVEC4, { TYPE_IVEC2, TYPE_INT, TYPE_INT, TYPE_VOID }, TAG_GLOBAL, false },
-	{ "ivec4", TYPE_IVEC4, { TYPE_INT, TYPE_INT, TYPE_IVEC2, TYPE_VOID }, TAG_GLOBAL, false },
-	{ "ivec4", TYPE_IVEC4, { TYPE_INT, TYPE_IVEC3, TYPE_VOID }, TAG_GLOBAL, false },
-	{ "ivec4", TYPE_IVEC4, { TYPE_IVEC3, TYPE_INT, TYPE_VOID }, TAG_GLOBAL, false },
-	{ "ivec4", TYPE_IVEC4, { TYPE_IVEC2, TYPE_IVEC2, TYPE_VOID }, TAG_GLOBAL, false },
+	{ "int", TYPE_INT, { TYPE_INT, TYPE_VOID }, { "" }, TAG_GLOBAL, false },
+	{ "ivec2", TYPE_IVEC2, { TYPE_INT, TYPE_VOID }, { "" }, TAG_GLOBAL, false },
+	{ "ivec2", TYPE_IVEC2, { TYPE_INT, TYPE_INT, TYPE_VOID }, { "" }, TAG_GLOBAL, false },
+	{ "ivec3", TYPE_IVEC3, { TYPE_INT, TYPE_VOID }, { "" }, TAG_GLOBAL, false },
+	{ "ivec3", TYPE_IVEC3, { TYPE_INT, TYPE_INT, TYPE_INT, TYPE_VOID }, { "" }, TAG_GLOBAL, false },
+	{ "ivec3", TYPE_IVEC3, { TYPE_IVEC2, TYPE_INT, TYPE_VOID }, { "" }, TAG_GLOBAL, false },
+	{ "ivec3", TYPE_IVEC3, { TYPE_INT, TYPE_IVEC2, TYPE_VOID }, { "" }, TAG_GLOBAL, false },
+	{ "ivec4", TYPE_IVEC4, { TYPE_INT, TYPE_VOID }, { "" }, TAG_GLOBAL, false },
+	{ "ivec4", TYPE_IVEC4, { TYPE_INT, TYPE_INT, TYPE_INT, TYPE_INT, TYPE_VOID }, { "" }, TAG_GLOBAL, false },
+	{ "ivec4", TYPE_IVEC4, { TYPE_INT, TYPE_IVEC2, TYPE_INT, TYPE_VOID }, { "" }, TAG_GLOBAL, false },
+	{ "ivec4", TYPE_IVEC4, { TYPE_IVEC2, TYPE_INT, TYPE_INT, TYPE_VOID }, { "" }, TAG_GLOBAL, false },
+	{ "ivec4", TYPE_IVEC4, { TYPE_INT, TYPE_INT, TYPE_IVEC2, TYPE_VOID }, { "" }, TAG_GLOBAL, false },
+	{ "ivec4", TYPE_IVEC4, { TYPE_INT, TYPE_IVEC3, TYPE_VOID }, { "" }, TAG_GLOBAL, false },
+	{ "ivec4", TYPE_IVEC4, { TYPE_IVEC3, TYPE_INT, TYPE_VOID }, { "" }, TAG_GLOBAL, false },
+	{ "ivec4", TYPE_IVEC4, { TYPE_IVEC2, TYPE_IVEC2, TYPE_VOID }, { "" }, TAG_GLOBAL, false },
 
-	{ "uint", TYPE_UINT, { TYPE_UINT, TYPE_VOID }, TAG_GLOBAL, true },
-	{ "uvec2", TYPE_UVEC2, { TYPE_UINT, TYPE_VOID }, TAG_GLOBAL, true },
-	{ "uvec2", TYPE_UVEC2, { TYPE_UINT, TYPE_UINT, TYPE_VOID }, TAG_GLOBAL, true },
-	{ "uvec3", TYPE_UVEC3, { TYPE_UINT, TYPE_VOID }, TAG_GLOBAL, true },
-	{ "uvec3", TYPE_UVEC3, { TYPE_UINT, TYPE_UINT, TYPE_UINT, TYPE_VOID }, TAG_GLOBAL, true },
-	{ "uvec3", TYPE_UVEC3, { TYPE_UVEC2, TYPE_UINT, TYPE_VOID }, TAG_GLOBAL, true },
-	{ "uvec3", TYPE_UVEC3, { TYPE_UINT, TYPE_UVEC2, TYPE_VOID }, TAG_GLOBAL, true },
-	{ "uvec4", TYPE_UVEC4, { TYPE_UINT, TYPE_VOID }, TAG_GLOBAL, true },
-	{ "uvec4", TYPE_UVEC4, { TYPE_UINT, TYPE_UINT, TYPE_UINT, TYPE_UINT, TYPE_VOID }, TAG_GLOBAL, true },
-	{ "uvec4", TYPE_UVEC4, { TYPE_UINT, TYPE_UVEC2, TYPE_UINT, TYPE_VOID }, TAG_GLOBAL, true },
-	{ "uvec4", TYPE_UVEC4, { TYPE_UVEC2, TYPE_UINT, TYPE_UINT, TYPE_VOID }, TAG_GLOBAL, true },
-	{ "uvec4", TYPE_UVEC4, { TYPE_UINT, TYPE_UINT, TYPE_UVEC2, TYPE_VOID }, TAG_GLOBAL, true },
-	{ "uvec4", TYPE_UVEC4, { TYPE_UINT, TYPE_UVEC3, TYPE_VOID }, TAG_GLOBAL, true },
-	{ "uvec4", TYPE_UVEC4, { TYPE_UVEC3, TYPE_UINT, TYPE_VOID }, TAG_GLOBAL, true },
-	{ "uvec4", TYPE_UVEC4, { TYPE_UVEC2, TYPE_UVEC2, TYPE_VOID }, TAG_GLOBAL, true },
+	{ "uint", TYPE_UINT, { TYPE_UINT, TYPE_VOID }, { "" }, TAG_GLOBAL, true },
+	{ "uvec2", TYPE_UVEC2, { TYPE_UINT, TYPE_VOID }, { "" }, TAG_GLOBAL, true },
+	{ "uvec2", TYPE_UVEC2, { TYPE_UINT, TYPE_UINT, TYPE_VOID }, { "" }, TAG_GLOBAL, true },
+	{ "uvec3", TYPE_UVEC3, { TYPE_UINT, TYPE_VOID }, { "" }, TAG_GLOBAL, true },
+	{ "uvec3", TYPE_UVEC3, { TYPE_UINT, TYPE_UINT, TYPE_UINT, TYPE_VOID }, { "" }, TAG_GLOBAL, true },
+	{ "uvec3", TYPE_UVEC3, { TYPE_UVEC2, TYPE_UINT, TYPE_VOID }, { "" }, TAG_GLOBAL, true },
+	{ "uvec3", TYPE_UVEC3, { TYPE_UINT, TYPE_UVEC2, TYPE_VOID }, { "" }, TAG_GLOBAL, true },
+	{ "uvec4", TYPE_UVEC4, { TYPE_UINT, TYPE_VOID }, { "" }, TAG_GLOBAL, true },
+	{ "uvec4", TYPE_UVEC4, { TYPE_UINT, TYPE_UINT, TYPE_UINT, TYPE_UINT, TYPE_VOID }, { "" }, TAG_GLOBAL, true },
+	{ "uvec4", TYPE_UVEC4, { TYPE_UINT, TYPE_UVEC2, TYPE_UINT, TYPE_VOID }, { "" }, TAG_GLOBAL, true },
+	{ "uvec4", TYPE_UVEC4, { TYPE_UVEC2, TYPE_UINT, TYPE_UINT, TYPE_VOID }, { "" }, TAG_GLOBAL, true },
+	{ "uvec4", TYPE_UVEC4, { TYPE_UINT, TYPE_UINT, TYPE_UVEC2, TYPE_VOID }, { "" }, TAG_GLOBAL, true },
+	{ "uvec4", TYPE_UVEC4, { TYPE_UINT, TYPE_UVEC3, TYPE_VOID }, { "" }, TAG_GLOBAL, true },
+	{ "uvec4", TYPE_UVEC4, { TYPE_UVEC3, TYPE_UINT, TYPE_VOID }, { "" }, TAG_GLOBAL, true },
+	{ "uvec4", TYPE_UVEC4, { TYPE_UVEC2, TYPE_UVEC2, TYPE_VOID }, { "" }, TAG_GLOBAL, true },
 
-	{ "mat2", TYPE_MAT2, { TYPE_VEC2, TYPE_VEC2, TYPE_VOID }, TAG_GLOBAL, false },
-	{ "mat3", TYPE_MAT3, { TYPE_VEC3, TYPE_VEC3, TYPE_VEC3, TYPE_VOID }, TAG_GLOBAL, false },
-	{ "mat4", TYPE_MAT4, { TYPE_VEC4, TYPE_VEC4, TYPE_VEC4, TYPE_VEC4, TYPE_VOID }, TAG_GLOBAL, false },
+	{ "mat2", TYPE_MAT2, { TYPE_VEC2, TYPE_VEC2, TYPE_VOID }, { "" }, TAG_GLOBAL, false },
+	{ "mat3", TYPE_MAT3, { TYPE_VEC3, TYPE_VEC3, TYPE_VEC3, TYPE_VOID }, { "" }, TAG_GLOBAL, false },
+	{ "mat4", TYPE_MAT4, { TYPE_VEC4, TYPE_VEC4, TYPE_VEC4, TYPE_VEC4, TYPE_VOID }, { "" }, TAG_GLOBAL, false },
 
-	{ "mat2", TYPE_MAT2, { TYPE_FLOAT, TYPE_VOID }, TAG_GLOBAL, false },
-	{ "mat3", TYPE_MAT3, { TYPE_FLOAT, TYPE_VOID }, TAG_GLOBAL, false },
-	{ "mat4", TYPE_MAT4, { TYPE_FLOAT, TYPE_VOID }, TAG_GLOBAL, false },
+	{ "mat2", TYPE_MAT2, { TYPE_FLOAT, TYPE_VOID }, { "" }, TAG_GLOBAL, false },
+	{ "mat3", TYPE_MAT3, { TYPE_FLOAT, TYPE_VOID }, { "" }, TAG_GLOBAL, false },
+	{ "mat4", TYPE_MAT4, { TYPE_FLOAT, TYPE_VOID }, { "" }, TAG_GLOBAL, false },
 
 	//conversion scalars
 
-	{ "int", TYPE_INT, { TYPE_BOOL, TYPE_VOID }, TAG_GLOBAL, false },
-	{ "int", TYPE_INT, { TYPE_INT, TYPE_VOID }, TAG_GLOBAL, false },
-	{ "int", TYPE_INT, { TYPE_UINT, TYPE_VOID }, TAG_GLOBAL, true },
-	{ "int", TYPE_INT, { TYPE_FLOAT, TYPE_VOID }, TAG_GLOBAL, false },
+	{ "int", TYPE_INT, { TYPE_BOOL, TYPE_VOID }, { "" }, TAG_GLOBAL, false },
+	{ "int", TYPE_INT, { TYPE_INT, TYPE_VOID }, { "" }, TAG_GLOBAL, false },
+	{ "int", TYPE_INT, { TYPE_UINT, TYPE_VOID }, { "" }, TAG_GLOBAL, true },
+	{ "int", TYPE_INT, { TYPE_FLOAT, TYPE_VOID }, { "" }, TAG_GLOBAL, false },
 
-	{ "float", TYPE_FLOAT, { TYPE_BOOL, TYPE_VOID }, TAG_GLOBAL, false },
-	{ "float", TYPE_FLOAT, { TYPE_INT, TYPE_VOID }, TAG_GLOBAL, false },
-	{ "float", TYPE_FLOAT, { TYPE_UINT, TYPE_VOID }, TAG_GLOBAL, true },
-	{ "float", TYPE_FLOAT, { TYPE_FLOAT, TYPE_VOID }, TAG_GLOBAL, false },
+	{ "float", TYPE_FLOAT, { TYPE_BOOL, TYPE_VOID }, { "" }, TAG_GLOBAL, false },
+	{ "float", TYPE_FLOAT, { TYPE_INT, TYPE_VOID }, { "" }, TAG_GLOBAL, false },
+	{ "float", TYPE_FLOAT, { TYPE_UINT, TYPE_VOID }, { "" }, TAG_GLOBAL, true },
+	{ "float", TYPE_FLOAT, { TYPE_FLOAT, TYPE_VOID }, { "" }, TAG_GLOBAL, false },
 
-	{ "uint", TYPE_UINT, { TYPE_BOOL, TYPE_VOID }, TAG_GLOBAL, true },
-	{ "uint", TYPE_UINT, { TYPE_INT, TYPE_VOID }, TAG_GLOBAL, true },
-	{ "uint", TYPE_UINT, { TYPE_UINT, TYPE_VOID }, TAG_GLOBAL, true },
-	{ "uint", TYPE_UINT, { TYPE_FLOAT, TYPE_VOID }, TAG_GLOBAL, true },
+	{ "uint", TYPE_UINT, { TYPE_BOOL, TYPE_VOID }, { "" }, TAG_GLOBAL, true },
+	{ "uint", TYPE_UINT, { TYPE_INT, TYPE_VOID }, { "" }, TAG_GLOBAL, true },
+	{ "uint", TYPE_UINT, { TYPE_UINT, TYPE_VOID }, { "" }, TAG_GLOBAL, true },
+	{ "uint", TYPE_UINT, { TYPE_FLOAT, TYPE_VOID }, { "" }, TAG_GLOBAL, true },
 
-	{ "bool", TYPE_BOOL, { TYPE_BOOL, TYPE_VOID }, TAG_GLOBAL, false },
-	{ "bool", TYPE_BOOL, { TYPE_INT, TYPE_VOID }, TAG_GLOBAL, false },
-	{ "bool", TYPE_BOOL, { TYPE_UINT, TYPE_VOID }, TAG_GLOBAL, true },
-	{ "bool", TYPE_BOOL, { TYPE_FLOAT, TYPE_VOID }, TAG_GLOBAL, false },
+	{ "bool", TYPE_BOOL, { TYPE_BOOL, TYPE_VOID }, { "" }, TAG_GLOBAL, false },
+	{ "bool", TYPE_BOOL, { TYPE_INT, TYPE_VOID }, { "" }, TAG_GLOBAL, false },
+	{ "bool", TYPE_BOOL, { TYPE_UINT, TYPE_VOID }, { "" }, TAG_GLOBAL, true },
+	{ "bool", TYPE_BOOL, { TYPE_FLOAT, TYPE_VOID }, { "" }, TAG_GLOBAL, false },
 
 	//conversion vectors
 
-	{ "ivec2", TYPE_IVEC2, { TYPE_BVEC2, TYPE_VOID }, TAG_GLOBAL, false },
-	{ "ivec2", TYPE_IVEC2, { TYPE_IVEC2, TYPE_VOID }, TAG_GLOBAL, false },
-	{ "ivec2", TYPE_IVEC2, { TYPE_UVEC2, TYPE_VOID }, TAG_GLOBAL, false },
-	{ "ivec2", TYPE_IVEC2, { TYPE_VEC2, TYPE_VOID }, TAG_GLOBAL, false },
+	{ "ivec2", TYPE_IVEC2, { TYPE_BVEC2, TYPE_VOID }, { "" }, TAG_GLOBAL, false },
+	{ "ivec2", TYPE_IVEC2, { TYPE_IVEC2, TYPE_VOID }, { "" }, TAG_GLOBAL, false },
+	{ "ivec2", TYPE_IVEC2, { TYPE_UVEC2, TYPE_VOID }, { "" }, TAG_GLOBAL, false },
+	{ "ivec2", TYPE_IVEC2, { TYPE_VEC2, TYPE_VOID }, { "" }, TAG_GLOBAL, false },
 
-	{ "vec2", TYPE_VEC2, { TYPE_BVEC2, TYPE_VOID }, TAG_GLOBAL, false },
-	{ "vec2", TYPE_VEC2, { TYPE_IVEC2, TYPE_VOID }, TAG_GLOBAL, false },
-	{ "vec2", TYPE_VEC2, { TYPE_UVEC2, TYPE_VOID }, TAG_GLOBAL, true },
-	{ "vec2", TYPE_VEC2, { TYPE_VEC2, TYPE_VOID }, TAG_GLOBAL, false },
+	{ "vec2", TYPE_VEC2, { TYPE_BVEC2, TYPE_VOID }, { "" }, TAG_GLOBAL, false },
+	{ "vec2", TYPE_VEC2, { TYPE_IVEC2, TYPE_VOID }, { "" }, TAG_GLOBAL, false },
+	{ "vec2", TYPE_VEC2, { TYPE_UVEC2, TYPE_VOID }, { "" }, TAG_GLOBAL, true },
+	{ "vec2", TYPE_VEC2, { TYPE_VEC2, TYPE_VOID }, { "" }, TAG_GLOBAL, false },
 
-	{ "uvec2", TYPE_UVEC2, { TYPE_BVEC2, TYPE_VOID }, TAG_GLOBAL, true },
-	{ "uvec2", TYPE_UVEC2, { TYPE_IVEC2, TYPE_VOID }, TAG_GLOBAL, true },
-	{ "uvec2", TYPE_UVEC2, { TYPE_UVEC2, TYPE_VOID }, TAG_GLOBAL, true },
-	{ "uvec2", TYPE_UVEC2, { TYPE_VEC2, TYPE_VOID }, TAG_GLOBAL, true },
+	{ "uvec2", TYPE_UVEC2, { TYPE_BVEC2, TYPE_VOID }, { "" }, TAG_GLOBAL, true },
+	{ "uvec2", TYPE_UVEC2, { TYPE_IVEC2, TYPE_VOID }, { "" }, TAG_GLOBAL, true },
+	{ "uvec2", TYPE_UVEC2, { TYPE_UVEC2, TYPE_VOID }, { "" }, TAG_GLOBAL, true },
+	{ "uvec2", TYPE_UVEC2, { TYPE_VEC2, TYPE_VOID }, { "" }, TAG_GLOBAL, true },
 
-	{ "bvec2", TYPE_BVEC2, { TYPE_BVEC2, TYPE_VOID }, TAG_GLOBAL, false },
-	{ "bvec2", TYPE_BVEC2, { TYPE_IVEC2, TYPE_VOID }, TAG_GLOBAL, false },
-	{ "bvec2", TYPE_BVEC2, { TYPE_UVEC2, TYPE_VOID }, TAG_GLOBAL, true },
-	{ "bvec2", TYPE_BVEC2, { TYPE_VEC2, TYPE_VOID }, TAG_GLOBAL, false },
+	{ "bvec2", TYPE_BVEC2, { TYPE_BVEC2, TYPE_VOID }, { "" }, TAG_GLOBAL, false },
+	{ "bvec2", TYPE_BVEC2, { TYPE_IVEC2, TYPE_VOID }, { "" }, TAG_GLOBAL, false },
+	{ "bvec2", TYPE_BVEC2, { TYPE_UVEC2, TYPE_VOID }, { "" }, TAG_GLOBAL, true },
+	{ "bvec2", TYPE_BVEC2, { TYPE_VEC2, TYPE_VOID }, { "" }, TAG_GLOBAL, false },
 
-	{ "ivec3", TYPE_IVEC3, { TYPE_BVEC3, TYPE_VOID }, TAG_GLOBAL, false },
-	{ "ivec3", TYPE_IVEC3, { TYPE_IVEC3, TYPE_VOID }, TAG_GLOBAL, false },
-	{ "ivec3", TYPE_IVEC3, { TYPE_UVEC3, TYPE_VOID }, TAG_GLOBAL, true },
-	{ "ivec3", TYPE_IVEC3, { TYPE_VEC3, TYPE_VOID }, TAG_GLOBAL, false },
+	{ "ivec3", TYPE_IVEC3, { TYPE_BVEC3, TYPE_VOID }, { "" }, TAG_GLOBAL, false },
+	{ "ivec3", TYPE_IVEC3, { TYPE_IVEC3, TYPE_VOID }, { "" }, TAG_GLOBAL, false },
+	{ "ivec3", TYPE_IVEC3, { TYPE_UVEC3, TYPE_VOID }, { "" }, TAG_GLOBAL, true },
+	{ "ivec3", TYPE_IVEC3, { TYPE_VEC3, TYPE_VOID }, { "" }, TAG_GLOBAL, false },
 
-	{ "vec3", TYPE_VEC3, { TYPE_BVEC3, TYPE_VOID }, TAG_GLOBAL, false },
-	{ "vec3", TYPE_VEC3, { TYPE_IVEC3, TYPE_VOID }, TAG_GLOBAL, false },
-	{ "vec3", TYPE_VEC3, { TYPE_UVEC3, TYPE_VOID }, TAG_GLOBAL, true },
-	{ "vec3", TYPE_VEC3, { TYPE_VEC3, TYPE_VOID }, TAG_GLOBAL, false },
+	{ "vec3", TYPE_VEC3, { TYPE_BVEC3, TYPE_VOID }, { "" }, TAG_GLOBAL, false },
+	{ "vec3", TYPE_VEC3, { TYPE_IVEC3, TYPE_VOID }, { "" }, TAG_GLOBAL, false },
+	{ "vec3", TYPE_VEC3, { TYPE_UVEC3, TYPE_VOID }, { "" }, TAG_GLOBAL, true },
+	{ "vec3", TYPE_VEC3, { TYPE_VEC3, TYPE_VOID }, { "" }, TAG_GLOBAL, false },
 
-	{ "uvec3", TYPE_UVEC3, { TYPE_BVEC3, TYPE_VOID }, TAG_GLOBAL, true },
-	{ "uvec3", TYPE_UVEC3, { TYPE_IVEC3, TYPE_VOID }, TAG_GLOBAL, true },
-	{ "uvec3", TYPE_UVEC3, { TYPE_UVEC3, TYPE_VOID }, TAG_GLOBAL, true },
-	{ "uvec3", TYPE_UVEC3, { TYPE_VEC3, TYPE_VOID }, TAG_GLOBAL, true },
+	{ "uvec3", TYPE_UVEC3, { TYPE_BVEC3, TYPE_VOID }, { "" }, TAG_GLOBAL, true },
+	{ "uvec3", TYPE_UVEC3, { TYPE_IVEC3, TYPE_VOID }, { "" }, TAG_GLOBAL, true },
+	{ "uvec3", TYPE_UVEC3, { TYPE_UVEC3, TYPE_VOID }, { "" }, TAG_GLOBAL, true },
+	{ "uvec3", TYPE_UVEC3, { TYPE_VEC3, TYPE_VOID }, { "" }, TAG_GLOBAL, true },
 
-	{ "bvec3", TYPE_BVEC3, { TYPE_BVEC3, TYPE_VOID }, TAG_GLOBAL, false },
-	{ "bvec3", TYPE_BVEC3, { TYPE_IVEC3, TYPE_VOID }, TAG_GLOBAL, false },
-	{ "bvec3", TYPE_BVEC3, { TYPE_UVEC3, TYPE_VOID }, TAG_GLOBAL, true },
-	{ "bvec3", TYPE_BVEC3, { TYPE_VEC3, TYPE_VOID }, TAG_GLOBAL, false },
+	{ "bvec3", TYPE_BVEC3, { TYPE_BVEC3, TYPE_VOID }, { "" }, TAG_GLOBAL, false },
+	{ "bvec3", TYPE_BVEC3, { TYPE_IVEC3, TYPE_VOID }, { "" }, TAG_GLOBAL, false },
+	{ "bvec3", TYPE_BVEC3, { TYPE_UVEC3, TYPE_VOID }, { "" }, TAG_GLOBAL, true },
+	{ "bvec3", TYPE_BVEC3, { TYPE_VEC3, TYPE_VOID }, { "" }, TAG_GLOBAL, false },
 
-	{ "ivec4", TYPE_IVEC4, { TYPE_BVEC4, TYPE_VOID }, TAG_GLOBAL, false },
-	{ "ivec4", TYPE_IVEC4, { TYPE_IVEC4, TYPE_VOID }, TAG_GLOBAL, false },
-	{ "ivec4", TYPE_IVEC4, { TYPE_UVEC4, TYPE_VOID }, TAG_GLOBAL, true },
-	{ "ivec4", TYPE_IVEC4, { TYPE_VEC4, TYPE_VOID }, TAG_GLOBAL, false },
+	{ "ivec4", TYPE_IVEC4, { TYPE_BVEC4, TYPE_VOID }, { "" }, TAG_GLOBAL, false },
+	{ "ivec4", TYPE_IVEC4, { TYPE_IVEC4, TYPE_VOID }, { "" }, TAG_GLOBAL, false },
+	{ "ivec4", TYPE_IVEC4, { TYPE_UVEC4, TYPE_VOID }, { "" }, TAG_GLOBAL, true },
+	{ "ivec4", TYPE_IVEC4, { TYPE_VEC4, TYPE_VOID }, { "" }, TAG_GLOBAL, false },
 
-	{ "vec4", TYPE_VEC4, { TYPE_BVEC4, TYPE_VOID }, TAG_GLOBAL, false },
-	{ "vec4", TYPE_VEC4, { TYPE_IVEC4, TYPE_VOID }, TAG_GLOBAL, false },
-	{ "vec4", TYPE_VEC4, { TYPE_UVEC4, TYPE_VOID }, TAG_GLOBAL, true },
-	{ "vec4", TYPE_VEC4, { TYPE_VEC4, TYPE_VOID }, TAG_GLOBAL, false },
+	{ "vec4", TYPE_VEC4, { TYPE_BVEC4, TYPE_VOID }, { "" }, TAG_GLOBAL, false },
+	{ "vec4", TYPE_VEC4, { TYPE_IVEC4, TYPE_VOID }, { "" }, TAG_GLOBAL, false },
+	{ "vec4", TYPE_VEC4, { TYPE_UVEC4, TYPE_VOID }, { "" }, TAG_GLOBAL, true },
+	{ "vec4", TYPE_VEC4, { TYPE_VEC4, TYPE_VOID }, { "" }, TAG_GLOBAL, false },
 
-	{ "uvec4", TYPE_UVEC4, { TYPE_BVEC4, TYPE_VOID }, TAG_GLOBAL, true },
-	{ "uvec4", TYPE_UVEC4, { TYPE_IVEC4, TYPE_VOID }, TAG_GLOBAL, true },
-	{ "uvec4", TYPE_UVEC4, { TYPE_UVEC4, TYPE_VOID }, TAG_GLOBAL, true },
-	{ "uvec4", TYPE_UVEC4, { TYPE_VEC4, TYPE_VOID }, TAG_GLOBAL, true },
+	{ "uvec4", TYPE_UVEC4, { TYPE_BVEC4, TYPE_VOID }, { "" }, TAG_GLOBAL, true },
+	{ "uvec4", TYPE_UVEC4, { TYPE_IVEC4, TYPE_VOID }, { "" }, TAG_GLOBAL, true },
+	{ "uvec4", TYPE_UVEC4, { TYPE_UVEC4, TYPE_VOID }, { "" }, TAG_GLOBAL, true },
+	{ "uvec4", TYPE_UVEC4, { TYPE_VEC4, TYPE_VOID }, { "" }, TAG_GLOBAL, true },
 
-	{ "bvec4", TYPE_BVEC4, { TYPE_BVEC4, TYPE_VOID }, TAG_GLOBAL, false },
-	{ "bvec4", TYPE_BVEC4, { TYPE_IVEC4, TYPE_VOID }, TAG_GLOBAL, false },
-	{ "bvec4", TYPE_BVEC4, { TYPE_UVEC4, TYPE_VOID }, TAG_GLOBAL, true },
-	{ "bvec4", TYPE_BVEC4, { TYPE_VEC4, TYPE_VOID }, TAG_GLOBAL, false },
+	{ "bvec4", TYPE_BVEC4, { TYPE_BVEC4, TYPE_VOID }, { "" }, TAG_GLOBAL, false },
+	{ "bvec4", TYPE_BVEC4, { TYPE_IVEC4, TYPE_VOID }, { "" }, TAG_GLOBAL, false },
+	{ "bvec4", TYPE_BVEC4, { TYPE_UVEC4, TYPE_VOID }, { "" }, TAG_GLOBAL, true },
+	{ "bvec4", TYPE_BVEC4, { TYPE_VEC4, TYPE_VOID }, { "" }, TAG_GLOBAL, false },
 
 	//conversion between matrixes
 
-	{ "mat2", TYPE_MAT2, { TYPE_MAT3, TYPE_VOID }, TAG_GLOBAL, false },
-	{ "mat2", TYPE_MAT2, { TYPE_MAT4, TYPE_VOID }, TAG_GLOBAL, false },
-	{ "mat3", TYPE_MAT3, { TYPE_MAT2, TYPE_VOID }, TAG_GLOBAL, false },
-	{ "mat3", TYPE_MAT3, { TYPE_MAT4, TYPE_VOID }, TAG_GLOBAL, false },
-	{ "mat4", TYPE_MAT4, { TYPE_MAT2, TYPE_VOID }, TAG_GLOBAL, false },
-	{ "mat4", TYPE_MAT4, { TYPE_MAT3, TYPE_VOID }, TAG_GLOBAL, false },
+	{ "mat2", TYPE_MAT2, { TYPE_MAT3, TYPE_VOID }, { "" }, TAG_GLOBAL, false },
+	{ "mat2", TYPE_MAT2, { TYPE_MAT4, TYPE_VOID }, { "" }, TAG_GLOBAL, false },
+	{ "mat3", TYPE_MAT3, { TYPE_MAT2, TYPE_VOID }, { "" }, TAG_GLOBAL, false },
+	{ "mat3", TYPE_MAT3, { TYPE_MAT4, TYPE_VOID }, { "" }, TAG_GLOBAL, false },
+	{ "mat4", TYPE_MAT4, { TYPE_MAT2, TYPE_VOID }, { "" }, TAG_GLOBAL, false },
+	{ "mat4", TYPE_MAT4, { TYPE_MAT3, TYPE_VOID }, { "" }, TAG_GLOBAL, false },
 
 	//builtins - trigonometry
 
-	{ "radians", TYPE_FLOAT, { TYPE_FLOAT, TYPE_VOID }, TAG_GLOBAL, false },
-	{ "radians", TYPE_VEC2, { TYPE_VEC2, TYPE_VOID }, TAG_GLOBAL, false },
-	{ "radians", TYPE_VEC3, { TYPE_VEC3, TYPE_VOID }, TAG_GLOBAL, false },
-	{ "radians", TYPE_VEC4, { TYPE_VEC4, TYPE_VOID }, TAG_GLOBAL, false },
+	{ "radians", TYPE_FLOAT, { TYPE_FLOAT, TYPE_VOID }, { "degrees" }, TAG_GLOBAL, false },
+	{ "radians", TYPE_VEC2, { TYPE_VEC2, TYPE_VOID }, { "degrees" }, TAG_GLOBAL, false },
+	{ "radians", TYPE_VEC3, { TYPE_VEC3, TYPE_VOID }, { "degrees" }, TAG_GLOBAL, false },
+	{ "radians", TYPE_VEC4, { TYPE_VEC4, TYPE_VOID }, { "degrees" }, TAG_GLOBAL, false },
 
-	{ "degrees", TYPE_FLOAT, { TYPE_FLOAT, TYPE_VOID }, TAG_GLOBAL, false },
-	{ "degrees", TYPE_VEC2, { TYPE_VEC2, TYPE_VOID }, TAG_GLOBAL, false },
-	{ "degrees", TYPE_VEC3, { TYPE_VEC3, TYPE_VOID }, TAG_GLOBAL, false },
-	{ "degrees", TYPE_VEC4, { TYPE_VEC4, TYPE_VOID }, TAG_GLOBAL, false },
+	{ "degrees", TYPE_FLOAT, { TYPE_FLOAT, TYPE_VOID }, { "radians" }, TAG_GLOBAL, false },
+	{ "degrees", TYPE_VEC2, { TYPE_VEC2, TYPE_VOID }, { "radians" }, TAG_GLOBAL, false },
+	{ "degrees", TYPE_VEC3, { TYPE_VEC3, TYPE_VOID }, { "radians" }, TAG_GLOBAL, false },
+	{ "degrees", TYPE_VEC4, { TYPE_VEC4, TYPE_VOID }, { "radians" }, TAG_GLOBAL, false },
 
-	{ "sin", TYPE_FLOAT, { TYPE_FLOAT, TYPE_VOID }, TAG_GLOBAL, false },
-	{ "sin", TYPE_VEC2, { TYPE_VEC2, TYPE_VOID }, TAG_GLOBAL, false },
-	{ "sin", TYPE_VEC3, { TYPE_VEC3, TYPE_VOID }, TAG_GLOBAL, false },
-	{ "sin", TYPE_VEC4, { TYPE_VEC4, TYPE_VOID }, TAG_GLOBAL, false },
+	{ "sin", TYPE_FLOAT, { TYPE_FLOAT, TYPE_VOID }, { "angle" }, TAG_GLOBAL, false },
+	{ "sin", TYPE_VEC2, { TYPE_VEC2, TYPE_VOID }, { "angle" }, TAG_GLOBAL, false },
+	{ "sin", TYPE_VEC3, { TYPE_VEC3, TYPE_VOID }, { "angle" }, TAG_GLOBAL, false },
+	{ "sin", TYPE_VEC4, { TYPE_VEC4, TYPE_VOID }, { "angle" }, TAG_GLOBAL, false },
 
-	{ "cos", TYPE_FLOAT, { TYPE_FLOAT, TYPE_VOID }, TAG_GLOBAL, false },
-	{ "cos", TYPE_VEC2, { TYPE_VEC2, TYPE_VOID }, TAG_GLOBAL, false },
-	{ "cos", TYPE_VEC3, { TYPE_VEC3, TYPE_VOID }, TAG_GLOBAL, false },
-	{ "cos", TYPE_VEC4, { TYPE_VEC4, TYPE_VOID }, TAG_GLOBAL, false },
+	{ "cos", TYPE_FLOAT, { TYPE_FLOAT, TYPE_VOID }, { "angle" }, TAG_GLOBAL, false },
+	{ "cos", TYPE_VEC2, { TYPE_VEC2, TYPE_VOID }, { "angle" }, TAG_GLOBAL, false },
+	{ "cos", TYPE_VEC3, { TYPE_VEC3, TYPE_VOID }, { "angle" }, TAG_GLOBAL, false },
+	{ "cos", TYPE_VEC4, { TYPE_VEC4, TYPE_VOID }, { "angle" }, TAG_GLOBAL, false },
 
-	{ "tan", TYPE_FLOAT, { TYPE_FLOAT, TYPE_VOID }, TAG_GLOBAL, false },
-	{ "tan", TYPE_VEC2, { TYPE_VEC2, TYPE_VOID }, TAG_GLOBAL, false },
-	{ "tan", TYPE_VEC3, { TYPE_VEC3, TYPE_VOID }, TAG_GLOBAL, false },
-	{ "tan", TYPE_VEC4, { TYPE_VEC4, TYPE_VOID }, TAG_GLOBAL, false },
+	{ "tan", TYPE_FLOAT, { TYPE_FLOAT, TYPE_VOID }, { "angle" }, TAG_GLOBAL, false },
+	{ "tan", TYPE_VEC2, { TYPE_VEC2, TYPE_VOID }, { "angle" }, TAG_GLOBAL, false },
+	{ "tan", TYPE_VEC3, { TYPE_VEC3, TYPE_VOID }, { "angle" }, TAG_GLOBAL, false },
+	{ "tan", TYPE_VEC4, { TYPE_VEC4, TYPE_VOID }, { "angle" }, TAG_GLOBAL, false },
 
-	{ "asin", TYPE_FLOAT, { TYPE_FLOAT, TYPE_VOID }, TAG_GLOBAL, false },
-	{ "asin", TYPE_VEC2, { TYPE_VEC2, TYPE_VOID }, TAG_GLOBAL, false },
-	{ "asin", TYPE_VEC3, { TYPE_VEC3, TYPE_VOID }, TAG_GLOBAL, false },
-	{ "asin", TYPE_VEC4, { TYPE_VEC4, TYPE_VOID }, TAG_GLOBAL, false },
+	{ "asin", TYPE_FLOAT, { TYPE_FLOAT, TYPE_VOID }, { "x" }, TAG_GLOBAL, false },
+	{ "asin", TYPE_VEC2, { TYPE_VEC2, TYPE_VOID }, { "x" }, TAG_GLOBAL, false },
+	{ "asin", TYPE_VEC3, { TYPE_VEC3, TYPE_VOID }, { "x" }, TAG_GLOBAL, false },
+	{ "asin", TYPE_VEC4, { TYPE_VEC4, TYPE_VOID }, { "x" }, TAG_GLOBAL, false },
 
-	{ "acos", TYPE_FLOAT, { TYPE_FLOAT, TYPE_VOID }, TAG_GLOBAL, false },
-	{ "acos", TYPE_VEC2, { TYPE_VEC2, TYPE_VOID }, TAG_GLOBAL, false },
-	{ "acos", TYPE_VEC3, { TYPE_VEC3, TYPE_VOID }, TAG_GLOBAL, false },
-	{ "acos", TYPE_VEC4, { TYPE_VEC4, TYPE_VOID }, TAG_GLOBAL, false },
+	{ "acos", TYPE_FLOAT, { TYPE_FLOAT, TYPE_VOID }, { "x" }, TAG_GLOBAL, false },
+	{ "acos", TYPE_VEC2, { TYPE_VEC2, TYPE_VOID }, { "x" }, TAG_GLOBAL, false },
+	{ "acos", TYPE_VEC3, { TYPE_VEC3, TYPE_VOID }, { "x" }, TAG_GLOBAL, false },
+	{ "acos", TYPE_VEC4, { TYPE_VEC4, TYPE_VOID }, { "x" }, TAG_GLOBAL, false },
 
-	{ "atan", TYPE_FLOAT, { TYPE_FLOAT, TYPE_VOID }, TAG_GLOBAL, false },
-	{ "atan", TYPE_VEC2, { TYPE_VEC2, TYPE_VOID }, TAG_GLOBAL, false },
-	{ "atan", TYPE_VEC3, { TYPE_VEC3, TYPE_VOID }, TAG_GLOBAL, false },
-	{ "atan", TYPE_VEC4, { TYPE_VEC4, TYPE_VOID }, TAG_GLOBAL, false },
-	{ "atan", TYPE_FLOAT, { TYPE_FLOAT, TYPE_FLOAT, TYPE_VOID }, TAG_GLOBAL, false },
-	{ "atan", TYPE_VEC2, { TYPE_VEC2, TYPE_VEC2, TYPE_VOID }, TAG_GLOBAL, false },
-	{ "atan", TYPE_VEC3, { TYPE_VEC3, TYPE_VEC3, TYPE_VOID }, TAG_GLOBAL, false },
-	{ "atan", TYPE_VEC4, { TYPE_VEC4, TYPE_VEC4, TYPE_VOID }, TAG_GLOBAL, false },
+	{ "atan", TYPE_FLOAT, { TYPE_FLOAT, TYPE_VOID }, { "y_over_x" }, TAG_GLOBAL, false },
+	{ "atan", TYPE_VEC2, { TYPE_VEC2, TYPE_VOID }, { "y_over_x" }, TAG_GLOBAL, false },
+	{ "atan", TYPE_VEC3, { TYPE_VEC3, TYPE_VOID }, { "y_over_x" }, TAG_GLOBAL, false },
+	{ "atan", TYPE_VEC4, { TYPE_VEC4, TYPE_VOID }, { "y_over_x" }, TAG_GLOBAL, false },
+	{ "atan", TYPE_FLOAT, { TYPE_FLOAT, TYPE_FLOAT, TYPE_VOID }, { "y", "x" }, TAG_GLOBAL, false },
+	{ "atan", TYPE_VEC2, { TYPE_VEC2, TYPE_VEC2, TYPE_VOID }, { "y", "x" }, TAG_GLOBAL, false },
+	{ "atan", TYPE_VEC3, { TYPE_VEC3, TYPE_VEC3, TYPE_VOID }, { "y", "x" }, TAG_GLOBAL, false },
+	{ "atan", TYPE_VEC4, { TYPE_VEC4, TYPE_VEC4, TYPE_VOID }, { "y", "x" }, TAG_GLOBAL, false },
 
-	{ "sinh", TYPE_FLOAT, { TYPE_FLOAT, TYPE_VOID }, TAG_GLOBAL, false },
-	{ "sinh", TYPE_VEC2, { TYPE_VEC2, TYPE_VOID }, TAG_GLOBAL, false },
-	{ "sinh", TYPE_VEC3, { TYPE_VEC3, TYPE_VOID }, TAG_GLOBAL, false },
-	{ "sinh", TYPE_VEC4, { TYPE_VEC4, TYPE_VOID }, TAG_GLOBAL, false },
+	{ "sinh", TYPE_FLOAT, { TYPE_FLOAT, TYPE_VOID }, { "x" }, TAG_GLOBAL, false },
+	{ "sinh", TYPE_VEC2, { TYPE_VEC2, TYPE_VOID }, { "x" }, TAG_GLOBAL, false },
+	{ "sinh", TYPE_VEC3, { TYPE_VEC3, TYPE_VOID }, { "x" }, TAG_GLOBAL, false },
+	{ "sinh", TYPE_VEC4, { TYPE_VEC4, TYPE_VOID }, { "x" }, TAG_GLOBAL, false },
 
-	{ "cosh", TYPE_FLOAT, { TYPE_FLOAT, TYPE_VOID }, TAG_GLOBAL, false },
-	{ "cosh", TYPE_VEC2, { TYPE_VEC2, TYPE_VOID }, TAG_GLOBAL, false },
-	{ "cosh", TYPE_VEC3, { TYPE_VEC3, TYPE_VOID }, TAG_GLOBAL, false },
-	{ "cosh", TYPE_VEC4, { TYPE_VEC4, TYPE_VOID }, TAG_GLOBAL, false },
+	{ "cosh", TYPE_FLOAT, { TYPE_FLOAT, TYPE_VOID }, { "x" }, TAG_GLOBAL, false },
+	{ "cosh", TYPE_VEC2, { TYPE_VEC2, TYPE_VOID }, { "x" }, TAG_GLOBAL, false },
+	{ "cosh", TYPE_VEC3, { TYPE_VEC3, TYPE_VOID }, { "x" }, TAG_GLOBAL, false },
+	{ "cosh", TYPE_VEC4, { TYPE_VEC4, TYPE_VOID }, { "x" }, TAG_GLOBAL, false },
 
-	{ "tanh", TYPE_FLOAT, { TYPE_FLOAT, TYPE_VOID }, TAG_GLOBAL, false },
-	{ "tanh", TYPE_VEC2, { TYPE_VEC2, TYPE_VOID }, TAG_GLOBAL, false },
-	{ "tanh", TYPE_VEC3, { TYPE_VEC3, TYPE_VOID }, TAG_GLOBAL, false },
-	{ "tanh", TYPE_VEC4, { TYPE_VEC4, TYPE_VOID }, TAG_GLOBAL, false },
+	{ "tanh", TYPE_FLOAT, { TYPE_FLOAT, TYPE_VOID }, { "x" }, TAG_GLOBAL, false },
+	{ "tanh", TYPE_VEC2, { TYPE_VEC2, TYPE_VOID }, { "x" }, TAG_GLOBAL, false },
+	{ "tanh", TYPE_VEC3, { TYPE_VEC3, TYPE_VOID }, { "x" }, TAG_GLOBAL, false },
+	{ "tanh", TYPE_VEC4, { TYPE_VEC4, TYPE_VOID }, { "x" }, TAG_GLOBAL, false },
 
-	{ "asinh", TYPE_FLOAT, { TYPE_FLOAT, TYPE_VOID }, TAG_GLOBAL, false },
-	{ "asinh", TYPE_VEC2, { TYPE_VEC2, TYPE_VOID }, TAG_GLOBAL, false },
-	{ "asinh", TYPE_VEC3, { TYPE_VEC3, TYPE_VOID }, TAG_GLOBAL, false },
-	{ "asinh", TYPE_VEC4, { TYPE_VEC4, TYPE_VOID }, TAG_GLOBAL, false },
+	{ "asinh", TYPE_FLOAT, { TYPE_FLOAT, TYPE_VOID }, { "x" }, TAG_GLOBAL, false },
+	{ "asinh", TYPE_VEC2, { TYPE_VEC2, TYPE_VOID }, { "x" }, TAG_GLOBAL, false },
+	{ "asinh", TYPE_VEC3, { TYPE_VEC3, TYPE_VOID }, { "x" }, TAG_GLOBAL, false },
+	{ "asinh", TYPE_VEC4, { TYPE_VEC4, TYPE_VOID }, { "x" }, TAG_GLOBAL, false },
 
-	{ "acosh", TYPE_FLOAT, { TYPE_FLOAT, TYPE_VOID }, TAG_GLOBAL, false },
-	{ "acosh", TYPE_VEC2, { TYPE_VEC2, TYPE_VOID }, TAG_GLOBAL, false },
-	{ "acosh", TYPE_VEC3, { TYPE_VEC3, TYPE_VOID }, TAG_GLOBAL, false },
-	{ "acosh", TYPE_VEC4, { TYPE_VEC4, TYPE_VOID }, TAG_GLOBAL, false },
+	{ "acosh", TYPE_FLOAT, { TYPE_FLOAT, TYPE_VOID }, { "x" }, TAG_GLOBAL, false },
+	{ "acosh", TYPE_VEC2, { TYPE_VEC2, TYPE_VOID }, { "x" }, TAG_GLOBAL, false },
+	{ "acosh", TYPE_VEC3, { TYPE_VEC3, TYPE_VOID }, { "x" }, TAG_GLOBAL, false },
+	{ "acosh", TYPE_VEC4, { TYPE_VEC4, TYPE_VOID }, { "x" }, TAG_GLOBAL, false },
 
-	{ "atanh", TYPE_FLOAT, { TYPE_FLOAT, TYPE_VOID }, TAG_GLOBAL, false },
-	{ "atanh", TYPE_VEC2, { TYPE_VEC2, TYPE_VOID }, TAG_GLOBAL, false },
-	{ "atanh", TYPE_VEC3, { TYPE_VEC3, TYPE_VOID }, TAG_GLOBAL, false },
-	{ "atanh", TYPE_VEC4, { TYPE_VEC4, TYPE_VOID }, TAG_GLOBAL, false },
+	{ "atanh", TYPE_FLOAT, { TYPE_FLOAT, TYPE_VOID }, { "x" }, TAG_GLOBAL, false },
+	{ "atanh", TYPE_VEC2, { TYPE_VEC2, TYPE_VOID }, { "x" }, TAG_GLOBAL, false },
+	{ "atanh", TYPE_VEC3, { TYPE_VEC3, TYPE_VOID }, { "x" }, TAG_GLOBAL, false },
+	{ "atanh", TYPE_VEC4, { TYPE_VEC4, TYPE_VOID }, { "x" }, TAG_GLOBAL, false },
 
 	//builtins - exponential
-	{ "pow", TYPE_FLOAT, { TYPE_FLOAT, TYPE_FLOAT, TYPE_VOID }, TAG_GLOBAL, false },
-	{ "pow", TYPE_VEC2, { TYPE_VEC2, TYPE_VEC2, TYPE_VOID }, TAG_GLOBAL, false },
-	{ "pow", TYPE_VEC3, { TYPE_VEC3, TYPE_VEC3, TYPE_VOID }, TAG_GLOBAL, false },
-	{ "pow", TYPE_VEC4, { TYPE_VEC4, TYPE_VEC4, TYPE_VOID }, TAG_GLOBAL, false },
-	{ "exp", TYPE_FLOAT, { TYPE_FLOAT, TYPE_VOID }, TAG_GLOBAL, false },
-	{ "exp", TYPE_VEC2, { TYPE_VEC2, TYPE_VOID }, TAG_GLOBAL, false },
-	{ "exp", TYPE_VEC3, { TYPE_VEC3, TYPE_VOID }, TAG_GLOBAL, false },
-	{ "exp", TYPE_VEC4, { TYPE_VEC4, TYPE_VOID }, TAG_GLOBAL, false },
-	{ "log", TYPE_FLOAT, { TYPE_FLOAT, TYPE_VOID }, TAG_GLOBAL, false },
-	{ "log", TYPE_VEC2, { TYPE_VEC2, TYPE_VOID }, TAG_GLOBAL, false },
-	{ "log", TYPE_VEC3, { TYPE_VEC3, TYPE_VOID }, TAG_GLOBAL, false },
-	{ "log", TYPE_VEC4, { TYPE_VEC4, TYPE_VOID }, TAG_GLOBAL, false },
-	{ "exp2", TYPE_FLOAT, { TYPE_FLOAT, TYPE_VOID }, TAG_GLOBAL, false },
-	{ "exp2", TYPE_VEC2, { TYPE_VEC2, TYPE_VOID }, TAG_GLOBAL, false },
-	{ "exp2", TYPE_VEC3, { TYPE_VEC3, TYPE_VOID }, TAG_GLOBAL, false },
-	{ "exp2", TYPE_VEC4, { TYPE_VEC4, TYPE_VOID }, TAG_GLOBAL, false },
-	{ "log2", TYPE_FLOAT, { TYPE_FLOAT, TYPE_VOID }, TAG_GLOBAL, false },
-	{ "log2", TYPE_VEC2, { TYPE_VEC2, TYPE_VOID }, TAG_GLOBAL, false },
-	{ "log2", TYPE_VEC3, { TYPE_VEC3, TYPE_VOID }, TAG_GLOBAL, false },
-	{ "log2", TYPE_VEC4, { TYPE_VEC4, TYPE_VOID }, TAG_GLOBAL, false },
-	{ "sqrt", TYPE_FLOAT, { TYPE_FLOAT, TYPE_VOID }, TAG_GLOBAL, false },
-	{ "sqrt", TYPE_VEC2, { TYPE_VEC2, TYPE_VOID }, TAG_GLOBAL, false },
-	{ "sqrt", TYPE_VEC3, { TYPE_VEC3, TYPE_VOID }, TAG_GLOBAL, false },
-	{ "sqrt", TYPE_VEC4, { TYPE_VEC4, TYPE_VOID }, TAG_GLOBAL, false },
-	{ "inversesqrt", TYPE_FLOAT, { TYPE_FLOAT, TYPE_VOID }, TAG_GLOBAL, false },
-	{ "inversesqrt", TYPE_VEC2, { TYPE_VEC2, TYPE_VOID }, TAG_GLOBAL, false },
-	{ "inversesqrt", TYPE_VEC3, { TYPE_VEC3, TYPE_VOID }, TAG_GLOBAL, false },
-	{ "inversesqrt", TYPE_VEC4, { TYPE_VEC4, TYPE_VOID }, TAG_GLOBAL, false },
+	{ "pow", TYPE_FLOAT, { TYPE_FLOAT, TYPE_FLOAT, TYPE_VOID }, { "x", "y" }, TAG_GLOBAL, false },
+	{ "pow", TYPE_VEC2, { TYPE_VEC2, TYPE_VEC2, TYPE_VOID }, { "x", "y" }, TAG_GLOBAL, false },
+	{ "pow", TYPE_VEC3, { TYPE_VEC3, TYPE_VEC3, TYPE_VOID }, { "x", "y" }, TAG_GLOBAL, false },
+	{ "pow", TYPE_VEC4, { TYPE_VEC4, TYPE_VEC4, TYPE_VOID }, { "x", "y" }, TAG_GLOBAL, false },
+	{ "exp", TYPE_FLOAT, { TYPE_FLOAT, TYPE_VOID }, { "x" }, TAG_GLOBAL, false },
+	{ "exp", TYPE_VEC2, { TYPE_VEC2, TYPE_VOID }, { "x" }, TAG_GLOBAL, false },
+	{ "exp", TYPE_VEC3, { TYPE_VEC3, TYPE_VOID }, { "x" }, TAG_GLOBAL, false },
+	{ "exp", TYPE_VEC4, { TYPE_VEC4, TYPE_VOID }, { "x" }, TAG_GLOBAL, false },
+	{ "log", TYPE_FLOAT, { TYPE_FLOAT, TYPE_VOID }, { "x" }, TAG_GLOBAL, false },
+	{ "log", TYPE_VEC2, { TYPE_VEC2, TYPE_VOID }, { "x" }, TAG_GLOBAL, false },
+	{ "log", TYPE_VEC3, { TYPE_VEC3, TYPE_VOID }, { "x" }, TAG_GLOBAL, false },
+	{ "log", TYPE_VEC4, { TYPE_VEC4, TYPE_VOID }, { "x" }, TAG_GLOBAL, false },
+	{ "exp2", TYPE_FLOAT, { TYPE_FLOAT, TYPE_VOID }, { "x" }, TAG_GLOBAL, false },
+	{ "exp2", TYPE_VEC2, { TYPE_VEC2, TYPE_VOID }, { "x" }, TAG_GLOBAL, false },
+	{ "exp2", TYPE_VEC3, { TYPE_VEC3, TYPE_VOID }, { "x" }, TAG_GLOBAL, false },
+	{ "exp2", TYPE_VEC4, { TYPE_VEC4, TYPE_VOID }, { "x" }, TAG_GLOBAL, false },
+	{ "log2", TYPE_FLOAT, { TYPE_FLOAT, TYPE_VOID }, { "x" }, TAG_GLOBAL, false },
+	{ "log2", TYPE_VEC2, { TYPE_VEC2, TYPE_VOID }, { "x" }, TAG_GLOBAL, false },
+	{ "log2", TYPE_VEC3, { TYPE_VEC3, TYPE_VOID }, { "x" }, TAG_GLOBAL, false },
+	{ "log2", TYPE_VEC4, { TYPE_VEC4, TYPE_VOID }, { "x" }, TAG_GLOBAL, false },
+	{ "sqrt", TYPE_FLOAT, { TYPE_FLOAT, TYPE_VOID }, { "x" }, TAG_GLOBAL, false },
+	{ "sqrt", TYPE_VEC2, { TYPE_VEC2, TYPE_VOID }, { "x" }, TAG_GLOBAL, false },
+	{ "sqrt", TYPE_VEC3, { TYPE_VEC3, TYPE_VOID }, { "x" }, TAG_GLOBAL, false },
+	{ "sqrt", TYPE_VEC4, { TYPE_VEC4, TYPE_VOID }, { "x" }, TAG_GLOBAL, false },
+	{ "inversesqrt", TYPE_FLOAT, { TYPE_FLOAT, TYPE_VOID }, { "x" }, TAG_GLOBAL, false },
+	{ "inversesqrt", TYPE_VEC2, { TYPE_VEC2, TYPE_VOID }, { "x" }, TAG_GLOBAL, false },
+	{ "inversesqrt", TYPE_VEC3, { TYPE_VEC3, TYPE_VOID }, { "x" }, TAG_GLOBAL, false },
+	{ "inversesqrt", TYPE_VEC4, { TYPE_VEC4, TYPE_VOID }, { "x" }, TAG_GLOBAL, false },
 	//builtins - common
-	{ "abs", TYPE_FLOAT, { TYPE_FLOAT, TYPE_VOID }, TAG_GLOBAL, false },
-	{ "abs", TYPE_VEC2, { TYPE_VEC2, TYPE_VOID }, TAG_GLOBAL, false },
-	{ "abs", TYPE_VEC3, { TYPE_VEC3, TYPE_VOID }, TAG_GLOBAL, false },
-	{ "abs", TYPE_VEC4, { TYPE_VEC4, TYPE_VOID }, TAG_GLOBAL, false },
+	{ "abs", TYPE_FLOAT, { TYPE_FLOAT, TYPE_VOID }, { "x" }, TAG_GLOBAL, false },
+	{ "abs", TYPE_VEC2, { TYPE_VEC2, TYPE_VOID }, { "x" }, TAG_GLOBAL, false },
+	{ "abs", TYPE_VEC3, { TYPE_VEC3, TYPE_VOID }, { "x" }, TAG_GLOBAL, false },
+	{ "abs", TYPE_VEC4, { TYPE_VEC4, TYPE_VOID }, { "x" }, TAG_GLOBAL, false },
 
-	{ "abs", TYPE_INT, { TYPE_INT, TYPE_VOID }, TAG_GLOBAL, false },
-	{ "abs", TYPE_IVEC2, { TYPE_IVEC2, TYPE_VOID }, TAG_GLOBAL, false },
-	{ "abs", TYPE_IVEC3, { TYPE_IVEC3, TYPE_VOID }, TAG_GLOBAL, false },
-	{ "abs", TYPE_IVEC4, { TYPE_IVEC4, TYPE_VOID }, TAG_GLOBAL, false },
+	{ "abs", TYPE_INT, { TYPE_INT, TYPE_VOID }, { "x" }, TAG_GLOBAL, false },
+	{ "abs", TYPE_IVEC2, { TYPE_IVEC2, TYPE_VOID }, { "x" }, TAG_GLOBAL, false },
+	{ "abs", TYPE_IVEC3, { TYPE_IVEC3, TYPE_VOID }, { "x" }, TAG_GLOBAL, false },
+	{ "abs", TYPE_IVEC4, { TYPE_IVEC4, TYPE_VOID }, { "x" }, TAG_GLOBAL, false },
 
-	{ "sign", TYPE_FLOAT, { TYPE_FLOAT, TYPE_VOID }, TAG_GLOBAL, false },
-	{ "sign", TYPE_VEC2, { TYPE_VEC2, TYPE_VOID }, TAG_GLOBAL, false },
-	{ "sign", TYPE_VEC3, { TYPE_VEC3, TYPE_VOID }, TAG_GLOBAL, false },
-	{ "sign", TYPE_VEC4, { TYPE_VEC4, TYPE_VOID }, TAG_GLOBAL, false },
+	{ "sign", TYPE_FLOAT, { TYPE_FLOAT, TYPE_VOID }, { "x" }, TAG_GLOBAL, false },
+	{ "sign", TYPE_VEC2, { TYPE_VEC2, TYPE_VOID }, { "x" }, TAG_GLOBAL, false },
+	{ "sign", TYPE_VEC3, { TYPE_VEC3, TYPE_VOID }, { "x" }, TAG_GLOBAL, false },
+	{ "sign", TYPE_VEC4, { TYPE_VEC4, TYPE_VOID }, { "x" }, TAG_GLOBAL, false },
 
-	{ "sign", TYPE_INT, { TYPE_INT, TYPE_VOID }, TAG_GLOBAL, false },
-	{ "sign", TYPE_IVEC2, { TYPE_IVEC2, TYPE_VOID }, TAG_GLOBAL, false },
-	{ "sign", TYPE_IVEC3, { TYPE_IVEC3, TYPE_VOID }, TAG_GLOBAL, false },
-	{ "sign", TYPE_IVEC4, { TYPE_IVEC4, TYPE_VOID }, TAG_GLOBAL, false },
+	{ "sign", TYPE_INT, { TYPE_INT, TYPE_VOID }, { "x" }, TAG_GLOBAL, false },
+	{ "sign", TYPE_IVEC2, { TYPE_IVEC2, TYPE_VOID }, { "x" }, TAG_GLOBAL, false },
+	{ "sign", TYPE_IVEC3, { TYPE_IVEC3, TYPE_VOID }, { "x" }, TAG_GLOBAL, false },
+	{ "sign", TYPE_IVEC4, { TYPE_IVEC4, TYPE_VOID }, { "x" }, TAG_GLOBAL, false },
 
-	{ "floor", TYPE_FLOAT, { TYPE_FLOAT, TYPE_VOID }, TAG_GLOBAL, false },
-	{ "floor", TYPE_VEC2, { TYPE_VEC2, TYPE_VOID }, TAG_GLOBAL, false },
-	{ "floor", TYPE_VEC3, { TYPE_VEC3, TYPE_VOID }, TAG_GLOBAL, false },
-	{ "floor", TYPE_VEC4, { TYPE_VEC4, TYPE_VOID }, TAG_GLOBAL, false },
-	{ "trunc", TYPE_FLOAT, { TYPE_FLOAT, TYPE_VOID }, TAG_GLOBAL, false },
-	{ "trunc", TYPE_VEC2, { TYPE_VEC2, TYPE_VOID }, TAG_GLOBAL, false },
-	{ "trunc", TYPE_VEC3, { TYPE_VEC3, TYPE_VOID }, TAG_GLOBAL, false },
-	{ "trunc", TYPE_VEC4, { TYPE_VEC4, TYPE_VOID }, TAG_GLOBAL, false },
-	{ "round", TYPE_FLOAT, { TYPE_FLOAT, TYPE_VOID }, TAG_GLOBAL, false },
-	{ "round", TYPE_VEC2, { TYPE_VEC2, TYPE_VOID }, TAG_GLOBAL, false },
-	{ "round", TYPE_VEC3, { TYPE_VEC3, TYPE_VOID }, TAG_GLOBAL, false },
-	{ "round", TYPE_VEC4, { TYPE_VEC4, TYPE_VOID }, TAG_GLOBAL, false },
-	{ "roundEven", TYPE_FLOAT, { TYPE_FLOAT, TYPE_VOID }, TAG_GLOBAL, false },
-	{ "roundEven", TYPE_VEC2, { TYPE_VEC2, TYPE_VOID }, TAG_GLOBAL, false },
-	{ "roundEven", TYPE_VEC3, { TYPE_VEC3, TYPE_VOID }, TAG_GLOBAL, false },
-	{ "roundEven", TYPE_VEC4, { TYPE_VEC4, TYPE_VOID }, TAG_GLOBAL, false },
-	{ "ceil", TYPE_FLOAT, { TYPE_FLOAT, TYPE_VOID }, TAG_GLOBAL, false },
-	{ "ceil", TYPE_VEC2, { TYPE_VEC2, TYPE_VOID }, TAG_GLOBAL, false },
-	{ "ceil", TYPE_VEC3, { TYPE_VEC3, TYPE_VOID }, TAG_GLOBAL, false },
-	{ "ceil", TYPE_VEC4, { TYPE_VEC4, TYPE_VOID }, TAG_GLOBAL, false },
-	{ "fract", TYPE_FLOAT, { TYPE_FLOAT, TYPE_VOID }, TAG_GLOBAL, false },
-	{ "fract", TYPE_VEC2, { TYPE_VEC2, TYPE_VOID }, TAG_GLOBAL, false },
-	{ "fract", TYPE_VEC3, { TYPE_VEC3, TYPE_VOID }, TAG_GLOBAL, false },
-	{ "fract", TYPE_VEC4, { TYPE_VEC4, TYPE_VOID }, TAG_GLOBAL, false },
+	{ "floor", TYPE_FLOAT, { TYPE_FLOAT, TYPE_VOID }, { "x" }, TAG_GLOBAL, false },
+	{ "floor", TYPE_VEC2, { TYPE_VEC2, TYPE_VOID }, { "x" }, TAG_GLOBAL, false },
+	{ "floor", TYPE_VEC3, { TYPE_VEC3, TYPE_VOID }, { "x" }, TAG_GLOBAL, false },
+	{ "floor", TYPE_VEC4, { TYPE_VEC4, TYPE_VOID }, { "x" }, TAG_GLOBAL, false },
+	{ "trunc", TYPE_FLOAT, { TYPE_FLOAT, TYPE_VOID }, { "x" }, TAG_GLOBAL, false },
+	{ "trunc", TYPE_VEC2, { TYPE_VEC2, TYPE_VOID }, { "x" }, TAG_GLOBAL, false },
+	{ "trunc", TYPE_VEC3, { TYPE_VEC3, TYPE_VOID }, { "x" }, TAG_GLOBAL, false },
+	{ "trunc", TYPE_VEC4, { TYPE_VEC4, TYPE_VOID }, { "x" }, TAG_GLOBAL, false },
+	{ "round", TYPE_FLOAT, { TYPE_FLOAT, TYPE_VOID }, { "x" }, TAG_GLOBAL, false },
+	{ "round", TYPE_VEC2, { TYPE_VEC2, TYPE_VOID }, { "x" }, TAG_GLOBAL, false },
+	{ "round", TYPE_VEC3, { TYPE_VEC3, TYPE_VOID }, { "x" }, TAG_GLOBAL, false },
+	{ "round", TYPE_VEC4, { TYPE_VEC4, TYPE_VOID }, { "x" }, TAG_GLOBAL, false },
+	{ "roundEven", TYPE_FLOAT, { TYPE_FLOAT, TYPE_VOID }, { "x" }, TAG_GLOBAL, false },
+	{ "roundEven", TYPE_VEC2, { TYPE_VEC2, TYPE_VOID }, { "x" }, TAG_GLOBAL, false },
+	{ "roundEven", TYPE_VEC3, { TYPE_VEC3, TYPE_VOID }, { "x" }, TAG_GLOBAL, false },
+	{ "roundEven", TYPE_VEC4, { TYPE_VEC4, TYPE_VOID }, { "x" }, TAG_GLOBAL, false },
+	{ "ceil", TYPE_FLOAT, { TYPE_FLOAT, TYPE_VOID }, { "x" }, TAG_GLOBAL, false },
+	{ "ceil", TYPE_VEC2, { TYPE_VEC2, TYPE_VOID }, { "x" }, TAG_GLOBAL, false },
+	{ "ceil", TYPE_VEC3, { TYPE_VEC3, TYPE_VOID }, { "x" }, TAG_GLOBAL, false },
+	{ "ceil", TYPE_VEC4, { TYPE_VEC4, TYPE_VOID }, { "x" }, TAG_GLOBAL, false },
+	{ "fract", TYPE_FLOAT, { TYPE_FLOAT, TYPE_VOID }, { "x" }, TAG_GLOBAL, false },
+	{ "fract", TYPE_VEC2, { TYPE_VEC2, TYPE_VOID }, { "x" }, TAG_GLOBAL, false },
+	{ "fract", TYPE_VEC3, { TYPE_VEC3, TYPE_VOID }, { "x" }, TAG_GLOBAL, false },
+	{ "fract", TYPE_VEC4, { TYPE_VEC4, TYPE_VOID }, { "x" }, TAG_GLOBAL, false },
 
-	{ "mod", TYPE_FLOAT, { TYPE_FLOAT, TYPE_FLOAT, TYPE_VOID }, TAG_GLOBAL, false },
-	{ "mod", TYPE_VEC2, { TYPE_VEC2, TYPE_VEC2, TYPE_VOID }, TAG_GLOBAL, false },
-	{ "mod", TYPE_VEC2, { TYPE_VEC2, TYPE_FLOAT, TYPE_VOID }, TAG_GLOBAL, false },
-	{ "mod", TYPE_VEC3, { TYPE_VEC3, TYPE_VEC3, TYPE_VOID }, TAG_GLOBAL, false },
-	{ "mod", TYPE_VEC3, { TYPE_VEC3, TYPE_FLOAT, TYPE_VOID }, TAG_GLOBAL, false },
-	{ "mod", TYPE_VEC4, { TYPE_VEC4, TYPE_VEC4, TYPE_VOID }, TAG_GLOBAL, false },
-	{ "mod", TYPE_VEC4, { TYPE_VEC4, TYPE_FLOAT, TYPE_VOID }, TAG_GLOBAL, false },
+	{ "mod", TYPE_FLOAT, { TYPE_FLOAT, TYPE_FLOAT, TYPE_VOID }, { "x", "y" }, TAG_GLOBAL, false },
+	{ "mod", TYPE_VEC2, { TYPE_VEC2, TYPE_VEC2, TYPE_VOID }, { "x", "y" }, TAG_GLOBAL, false },
+	{ "mod", TYPE_VEC2, { TYPE_VEC2, TYPE_FLOAT, TYPE_VOID }, { "x", "y" }, TAG_GLOBAL, false },
+	{ "mod", TYPE_VEC3, { TYPE_VEC3, TYPE_VEC3, TYPE_VOID }, { "x", "y" }, TAG_GLOBAL, false },
+	{ "mod", TYPE_VEC3, { TYPE_VEC3, TYPE_FLOAT, TYPE_VOID }, { "x", "y" }, TAG_GLOBAL, false },
+	{ "mod", TYPE_VEC4, { TYPE_VEC4, TYPE_VEC4, TYPE_VOID }, { "x", "y" }, TAG_GLOBAL, false },
+	{ "mod", TYPE_VEC4, { TYPE_VEC4, TYPE_FLOAT, TYPE_VOID }, { "x", "y" }, TAG_GLOBAL, false },
 
-	{ "modf", TYPE_FLOAT, { TYPE_FLOAT, TYPE_FLOAT, TYPE_VOID }, TAG_GLOBAL, true },
-	{ "modf", TYPE_VEC2, { TYPE_VEC2, TYPE_VEC2, TYPE_VOID }, TAG_GLOBAL, true },
-	{ "modf", TYPE_VEC3, { TYPE_VEC3, TYPE_VEC3, TYPE_VOID }, TAG_GLOBAL, true },
-	{ "modf", TYPE_VEC4, { TYPE_VEC4, TYPE_VEC4, TYPE_VOID }, TAG_GLOBAL, true },
+	{ "modf", TYPE_FLOAT, { TYPE_FLOAT, TYPE_FLOAT, TYPE_VOID }, { "x", "i" }, TAG_GLOBAL, true },
+	{ "modf", TYPE_VEC2, { TYPE_VEC2, TYPE_VEC2, TYPE_VOID }, { "x", "i" }, TAG_GLOBAL, true },
+	{ "modf", TYPE_VEC3, { TYPE_VEC3, TYPE_VEC3, TYPE_VOID }, { "x", "i" }, TAG_GLOBAL, true },
+	{ "modf", TYPE_VEC4, { TYPE_VEC4, TYPE_VEC4, TYPE_VOID }, { "x", "i" }, TAG_GLOBAL, true },
 
-	{ "min", TYPE_FLOAT, { TYPE_FLOAT, TYPE_FLOAT, TYPE_VOID }, TAG_GLOBAL, false },
-	{ "min", TYPE_VEC2, { TYPE_VEC2, TYPE_VEC2, TYPE_VOID }, TAG_GLOBAL, false },
-	{ "min", TYPE_VEC2, { TYPE_VEC2, TYPE_FLOAT, TYPE_VOID }, TAG_GLOBAL, false },
-	{ "min", TYPE_VEC3, { TYPE_VEC3, TYPE_VEC3, TYPE_VOID }, TAG_GLOBAL, false },
-	{ "min", TYPE_VEC3, { TYPE_VEC3, TYPE_FLOAT, TYPE_VOID }, TAG_GLOBAL, false },
-	{ "min", TYPE_VEC4, { TYPE_VEC4, TYPE_VEC4, TYPE_VOID }, TAG_GLOBAL, false },
-	{ "min", TYPE_VEC4, { TYPE_VEC4, TYPE_FLOAT, TYPE_VOID }, TAG_GLOBAL, false },
+	{ "min", TYPE_FLOAT, { TYPE_FLOAT, TYPE_FLOAT, TYPE_VOID }, { "a", "b" }, TAG_GLOBAL, false },
+	{ "min", TYPE_VEC2, { TYPE_VEC2, TYPE_VEC2, TYPE_VOID }, { "a", "b" }, TAG_GLOBAL, false },
+	{ "min", TYPE_VEC2, { TYPE_VEC2, TYPE_FLOAT, TYPE_VOID }, { "a", "b" }, TAG_GLOBAL, false },
+	{ "min", TYPE_VEC3, { TYPE_VEC3, TYPE_VEC3, TYPE_VOID }, { "a", "b" }, TAG_GLOBAL, false },
+	{ "min", TYPE_VEC3, { TYPE_VEC3, TYPE_FLOAT, TYPE_VOID }, { "a", "b" }, TAG_GLOBAL, false },
+	{ "min", TYPE_VEC4, { TYPE_VEC4, TYPE_VEC4, TYPE_VOID }, { "a", "b" }, TAG_GLOBAL, false },
+	{ "min", TYPE_VEC4, { TYPE_VEC4, TYPE_FLOAT, TYPE_VOID }, { "a", "b" }, TAG_GLOBAL, false },
 
-	{ "min", TYPE_INT, { TYPE_INT, TYPE_INT, TYPE_VOID }, TAG_GLOBAL, false },
-	{ "min", TYPE_IVEC2, { TYPE_IVEC2, TYPE_IVEC2, TYPE_VOID }, TAG_GLOBAL, false },
-	{ "min", TYPE_IVEC2, { TYPE_IVEC2, TYPE_INT, TYPE_VOID }, TAG_GLOBAL, false },
-	{ "min", TYPE_IVEC3, { TYPE_IVEC3, TYPE_IVEC3, TYPE_VOID }, TAG_GLOBAL, false },
-	{ "min", TYPE_IVEC3, { TYPE_IVEC3, TYPE_INT, TYPE_VOID }, TAG_GLOBAL, false },
-	{ "min", TYPE_IVEC4, { TYPE_IVEC4, TYPE_IVEC4, TYPE_VOID }, TAG_GLOBAL, false },
-	{ "min", TYPE_IVEC4, { TYPE_IVEC4, TYPE_INT, TYPE_VOID }, TAG_GLOBAL, false },
+	{ "min", TYPE_INT, { TYPE_INT, TYPE_INT, TYPE_VOID }, { "a", "b" }, TAG_GLOBAL, false },
+	{ "min", TYPE_IVEC2, { TYPE_IVEC2, TYPE_IVEC2, TYPE_VOID }, { "a", "b" }, TAG_GLOBAL, false },
+	{ "min", TYPE_IVEC2, { TYPE_IVEC2, TYPE_INT, TYPE_VOID }, { "a", "b" }, TAG_GLOBAL, false },
+	{ "min", TYPE_IVEC3, { TYPE_IVEC3, TYPE_IVEC3, TYPE_VOID }, { "a", "b" }, TAG_GLOBAL, false },
+	{ "min", TYPE_IVEC3, { TYPE_IVEC3, TYPE_INT, TYPE_VOID }, { "a", "b" }, TAG_GLOBAL, false },
+	{ "min", TYPE_IVEC4, { TYPE_IVEC4, TYPE_IVEC4, TYPE_VOID }, { "a", "b" }, TAG_GLOBAL, false },
+	{ "min", TYPE_IVEC4, { TYPE_IVEC4, TYPE_INT, TYPE_VOID }, { "a", "b" }, TAG_GLOBAL, false },
 
-	{ "min", TYPE_UINT, { TYPE_UINT, TYPE_UINT, TYPE_VOID }, TAG_GLOBAL, true },
-	{ "min", TYPE_UVEC2, { TYPE_UVEC2, TYPE_UVEC2, TYPE_VOID }, TAG_GLOBAL, true },
-	{ "min", TYPE_UVEC2, { TYPE_UVEC2, TYPE_UINT, TYPE_VOID }, TAG_GLOBAL, true },
-	{ "min", TYPE_UVEC3, { TYPE_UVEC3, TYPE_UVEC3, TYPE_VOID }, TAG_GLOBAL, true },
-	{ "min", TYPE_UVEC3, { TYPE_UVEC3, TYPE_UINT, TYPE_VOID }, TAG_GLOBAL, true },
-	{ "min", TYPE_UVEC4, { TYPE_UVEC4, TYPE_UVEC4, TYPE_VOID }, TAG_GLOBAL, true },
-	{ "min", TYPE_UVEC4, { TYPE_UVEC4, TYPE_UINT, TYPE_VOID }, TAG_GLOBAL, true },
+	{ "min", TYPE_UINT, { TYPE_UINT, TYPE_UINT, TYPE_VOID }, { "a", "b" }, TAG_GLOBAL, true },
+	{ "min", TYPE_UVEC2, { TYPE_UVEC2, TYPE_UVEC2, TYPE_VOID }, { "a", "b" }, TAG_GLOBAL, true },
+	{ "min", TYPE_UVEC2, { TYPE_UVEC2, TYPE_UINT, TYPE_VOID }, { "a", "b" }, TAG_GLOBAL, true },
+	{ "min", TYPE_UVEC3, { TYPE_UVEC3, TYPE_UVEC3, TYPE_VOID }, { "a", "b" }, TAG_GLOBAL, true },
+	{ "min", TYPE_UVEC3, { TYPE_UVEC3, TYPE_UINT, TYPE_VOID }, { "a", "b" }, TAG_GLOBAL, true },
+	{ "min", TYPE_UVEC4, { TYPE_UVEC4, TYPE_UVEC4, TYPE_VOID }, { "a", "b" }, TAG_GLOBAL, true },
+	{ "min", TYPE_UVEC4, { TYPE_UVEC4, TYPE_UINT, TYPE_VOID }, { "a", "b" }, TAG_GLOBAL, true },
 
-	{ "max", TYPE_FLOAT, { TYPE_FLOAT, TYPE_FLOAT, TYPE_VOID }, TAG_GLOBAL, false },
-	{ "max", TYPE_VEC2, { TYPE_VEC2, TYPE_VEC2, TYPE_VOID }, TAG_GLOBAL, false },
-	{ "max", TYPE_VEC2, { TYPE_VEC2, TYPE_FLOAT, TYPE_VOID }, TAG_GLOBAL, false },
-	{ "max", TYPE_VEC3, { TYPE_VEC3, TYPE_VEC3, TYPE_VOID }, TAG_GLOBAL, false },
-	{ "max", TYPE_VEC3, { TYPE_VEC3, TYPE_FLOAT, TYPE_VOID }, TAG_GLOBAL, false },
-	{ "max", TYPE_VEC4, { TYPE_VEC4, TYPE_VEC4, TYPE_VOID }, TAG_GLOBAL, false },
-	{ "max", TYPE_VEC4, { TYPE_VEC4, TYPE_FLOAT, TYPE_VOID }, TAG_GLOBAL, false },
+	{ "max", TYPE_FLOAT, { TYPE_FLOAT, TYPE_FLOAT, TYPE_VOID }, { "a", "b" }, TAG_GLOBAL, false },
+	{ "max", TYPE_VEC2, { TYPE_VEC2, TYPE_VEC2, TYPE_VOID }, { "a", "b" }, TAG_GLOBAL, false },
+	{ "max", TYPE_VEC2, { TYPE_VEC2, TYPE_FLOAT, TYPE_VOID }, { "a", "b" }, TAG_GLOBAL, false },
+	{ "max", TYPE_VEC3, { TYPE_VEC3, TYPE_VEC3, TYPE_VOID }, { "a", "b" }, TAG_GLOBAL, false },
+	{ "max", TYPE_VEC3, { TYPE_VEC3, TYPE_FLOAT, TYPE_VOID }, { "a", "b" }, TAG_GLOBAL, false },
+	{ "max", TYPE_VEC4, { TYPE_VEC4, TYPE_VEC4, TYPE_VOID }, { "a", "b" }, TAG_GLOBAL, false },
+	{ "max", TYPE_VEC4, { TYPE_VEC4, TYPE_FLOAT, TYPE_VOID }, { "a", "b" }, TAG_GLOBAL, false },
 
-	{ "max", TYPE_INT, { TYPE_INT, TYPE_INT, TYPE_VOID }, TAG_GLOBAL, false },
-	{ "max", TYPE_IVEC2, { TYPE_IVEC2, TYPE_IVEC2, TYPE_VOID }, TAG_GLOBAL, false },
-	{ "max", TYPE_IVEC2, { TYPE_IVEC2, TYPE_INT, TYPE_VOID }, TAG_GLOBAL, false },
-	{ "max", TYPE_IVEC3, { TYPE_IVEC3, TYPE_IVEC3, TYPE_VOID }, TAG_GLOBAL, false },
-	{ "max", TYPE_IVEC3, { TYPE_IVEC3, TYPE_INT, TYPE_VOID }, TAG_GLOBAL, false },
-	{ "max", TYPE_IVEC4, { TYPE_IVEC4, TYPE_IVEC4, TYPE_VOID }, TAG_GLOBAL, false },
-	{ "max", TYPE_IVEC4, { TYPE_IVEC4, TYPE_INT, TYPE_VOID }, TAG_GLOBAL, false },
+	{ "max", TYPE_INT, { TYPE_INT, TYPE_INT, TYPE_VOID }, { "a", "b" }, TAG_GLOBAL, false },
+	{ "max", TYPE_IVEC2, { TYPE_IVEC2, TYPE_IVEC2, TYPE_VOID }, { "a", "b" }, TAG_GLOBAL, false },
+	{ "max", TYPE_IVEC2, { TYPE_IVEC2, TYPE_INT, TYPE_VOID }, { "a", "b" }, TAG_GLOBAL, false },
+	{ "max", TYPE_IVEC3, { TYPE_IVEC3, TYPE_IVEC3, TYPE_VOID }, { "a", "b" }, TAG_GLOBAL, false },
+	{ "max", TYPE_IVEC3, { TYPE_IVEC3, TYPE_INT, TYPE_VOID }, { "a", "b" }, TAG_GLOBAL, false },
+	{ "max", TYPE_IVEC4, { TYPE_IVEC4, TYPE_IVEC4, TYPE_VOID }, { "a", "b" }, TAG_GLOBAL, false },
+	{ "max", TYPE_IVEC4, { TYPE_IVEC4, TYPE_INT, TYPE_VOID }, { "a", "b" }, TAG_GLOBAL, false },
 
-	{ "max", TYPE_UINT, { TYPE_UINT, TYPE_UINT, TYPE_VOID }, TAG_GLOBAL, true },
-	{ "max", TYPE_UVEC2, { TYPE_UVEC2, TYPE_UVEC2, TYPE_VOID }, TAG_GLOBAL, true },
-	{ "max", TYPE_UVEC2, { TYPE_UVEC2, TYPE_UINT, TYPE_VOID }, TAG_GLOBAL, true },
-	{ "max", TYPE_UVEC3, { TYPE_UVEC3, TYPE_UVEC3, TYPE_VOID }, TAG_GLOBAL, true },
-	{ "max", TYPE_UVEC3, { TYPE_UVEC3, TYPE_UINT, TYPE_VOID }, TAG_GLOBAL, true },
-	{ "max", TYPE_UVEC4, { TYPE_UVEC4, TYPE_UVEC4, TYPE_VOID }, TAG_GLOBAL, true },
-	{ "max", TYPE_UVEC4, { TYPE_UVEC4, TYPE_UINT, TYPE_VOID }, TAG_GLOBAL, true },
+	{ "max", TYPE_UINT, { TYPE_UINT, TYPE_UINT, TYPE_VOID }, { "a", "b" }, TAG_GLOBAL, true },
+	{ "max", TYPE_UVEC2, { TYPE_UVEC2, TYPE_UVEC2, TYPE_VOID }, { "a", "b" }, TAG_GLOBAL, true },
+	{ "max", TYPE_UVEC2, { TYPE_UVEC2, TYPE_UINT, TYPE_VOID }, { "a", "b" }, TAG_GLOBAL, true },
+	{ "max", TYPE_UVEC3, { TYPE_UVEC3, TYPE_UVEC3, TYPE_VOID }, { "a", "b" }, TAG_GLOBAL, true },
+	{ "max", TYPE_UVEC3, { TYPE_UVEC3, TYPE_UINT, TYPE_VOID }, { "a", "b" }, TAG_GLOBAL, true },
+	{ "max", TYPE_UVEC4, { TYPE_UVEC4, TYPE_UVEC4, TYPE_VOID }, { "a", "b" }, TAG_GLOBAL, true },
+	{ "max", TYPE_UVEC4, { TYPE_UVEC4, TYPE_UINT, TYPE_VOID }, { "a", "b" }, TAG_GLOBAL, true },
 
-	{ "clamp", TYPE_FLOAT, { TYPE_FLOAT, TYPE_FLOAT, TYPE_FLOAT, TYPE_VOID }, TAG_GLOBAL, false },
-	{ "clamp", TYPE_VEC2, { TYPE_VEC2, TYPE_VEC2, TYPE_VEC2, TYPE_VOID }, TAG_GLOBAL, false },
-	{ "clamp", TYPE_VEC3, { TYPE_VEC3, TYPE_VEC3, TYPE_VEC3, TYPE_VOID }, TAG_GLOBAL, false },
-	{ "clamp", TYPE_VEC4, { TYPE_VEC4, TYPE_VEC4, TYPE_VEC4, TYPE_VOID }, TAG_GLOBAL, false },
-	{ "clamp", TYPE_VEC2, { TYPE_VEC2, TYPE_FLOAT, TYPE_FLOAT, TYPE_VOID }, TAG_GLOBAL, false },
-	{ "clamp", TYPE_VEC3, { TYPE_VEC3, TYPE_FLOAT, TYPE_FLOAT, TYPE_VOID }, TAG_GLOBAL, false },
-	{ "clamp", TYPE_VEC4, { TYPE_VEC4, TYPE_FLOAT, TYPE_FLOAT, TYPE_VOID }, TAG_GLOBAL, false },
+	{ "clamp", TYPE_FLOAT, { TYPE_FLOAT, TYPE_FLOAT, TYPE_FLOAT, TYPE_VOID }, { "x", "minVal", "maxVal" }, TAG_GLOBAL, false },
+	{ "clamp", TYPE_VEC2, { TYPE_VEC2, TYPE_VEC2, TYPE_VEC2, TYPE_VOID }, { "x", "minVal", "maxVal" }, TAG_GLOBAL, false },
+	{ "clamp", TYPE_VEC3, { TYPE_VEC3, TYPE_VEC3, TYPE_VEC3, TYPE_VOID }, { "x", "minVal", "maxVal" }, TAG_GLOBAL, false },
+	{ "clamp", TYPE_VEC4, { TYPE_VEC4, TYPE_VEC4, TYPE_VEC4, TYPE_VOID }, { "x", "minVal", "maxVal" }, TAG_GLOBAL, false },
+	{ "clamp", TYPE_VEC2, { TYPE_VEC2, TYPE_FLOAT, TYPE_FLOAT, TYPE_VOID }, { "x", "minVal", "maxVal" }, TAG_GLOBAL, false },
+	{ "clamp", TYPE_VEC3, { TYPE_VEC3, TYPE_FLOAT, TYPE_FLOAT, TYPE_VOID }, { "x", "minVal", "maxVal" }, TAG_GLOBAL, false },
+	{ "clamp", TYPE_VEC4, { TYPE_VEC4, TYPE_FLOAT, TYPE_FLOAT, TYPE_VOID }, { "x", "minVal", "maxVal" }, TAG_GLOBAL, false },
 
-	{ "clamp", TYPE_INT, { TYPE_INT, TYPE_INT, TYPE_INT, TYPE_VOID }, TAG_GLOBAL, false },
-	{ "clamp", TYPE_IVEC2, { TYPE_IVEC2, TYPE_IVEC2, TYPE_IVEC2, TYPE_VOID }, TAG_GLOBAL, false },
-	{ "clamp", TYPE_IVEC3, { TYPE_IVEC3, TYPE_IVEC3, TYPE_IVEC3, TYPE_VOID }, TAG_GLOBAL, false },
-	{ "clamp", TYPE_IVEC4, { TYPE_IVEC4, TYPE_IVEC4, TYPE_IVEC4, TYPE_VOID }, TAG_GLOBAL, false },
-	{ "clamp", TYPE_IVEC2, { TYPE_IVEC2, TYPE_INT, TYPE_INT, TYPE_VOID }, TAG_GLOBAL, false },
-	{ "clamp", TYPE_IVEC3, { TYPE_IVEC3, TYPE_INT, TYPE_INT, TYPE_VOID }, TAG_GLOBAL, false },
-	{ "clamp", TYPE_IVEC4, { TYPE_IVEC4, TYPE_INT, TYPE_INT, TYPE_VOID }, TAG_GLOBAL, false },
+	{ "clamp", TYPE_INT, { TYPE_INT, TYPE_INT, TYPE_INT, TYPE_VOID }, { "x", "minVal", "maxVal" }, TAG_GLOBAL, false },
+	{ "clamp", TYPE_IVEC2, { TYPE_IVEC2, TYPE_IVEC2, TYPE_IVEC2, TYPE_VOID }, { "x", "minVal", "maxVal" }, TAG_GLOBAL, false },
+	{ "clamp", TYPE_IVEC3, { TYPE_IVEC3, TYPE_IVEC3, TYPE_IVEC3, TYPE_VOID }, { "x", "minVal", "maxVal" }, TAG_GLOBAL, false },
+	{ "clamp", TYPE_IVEC4, { TYPE_IVEC4, TYPE_IVEC4, TYPE_IVEC4, TYPE_VOID }, { "x", "minVal", "maxVal" }, TAG_GLOBAL, false },
+	{ "clamp", TYPE_IVEC2, { TYPE_IVEC2, TYPE_INT, TYPE_INT, TYPE_VOID }, { "x", "minVal", "maxVal" }, TAG_GLOBAL, false },
+	{ "clamp", TYPE_IVEC3, { TYPE_IVEC3, TYPE_INT, TYPE_INT, TYPE_VOID }, { "x", "minVal", "maxVal" }, TAG_GLOBAL, false },
+	{ "clamp", TYPE_IVEC4, { TYPE_IVEC4, TYPE_INT, TYPE_INT, TYPE_VOID }, { "x", "minVal", "maxVal" }, TAG_GLOBAL, false },
 
-	{ "clamp", TYPE_UINT, { TYPE_UINT, TYPE_UINT, TYPE_UINT, TYPE_VOID }, TAG_GLOBAL, true },
-	{ "clamp", TYPE_UVEC2, { TYPE_UVEC2, TYPE_UVEC2, TYPE_UVEC2, TYPE_VOID }, TAG_GLOBAL, true },
-	{ "clamp", TYPE_UVEC3, { TYPE_UVEC3, TYPE_UVEC3, TYPE_UVEC3, TYPE_VOID }, TAG_GLOBAL, true },
-	{ "clamp", TYPE_UVEC4, { TYPE_UVEC4, TYPE_UVEC4, TYPE_UVEC4, TYPE_VOID }, TAG_GLOBAL, true },
-	{ "clamp", TYPE_UVEC2, { TYPE_UVEC2, TYPE_UINT, TYPE_UINT, TYPE_VOID }, TAG_GLOBAL, true },
-	{ "clamp", TYPE_UVEC3, { TYPE_UVEC3, TYPE_UINT, TYPE_UINT, TYPE_VOID }, TAG_GLOBAL, true },
-	{ "clamp", TYPE_UVEC4, { TYPE_UVEC4, TYPE_UINT, TYPE_UINT, TYPE_VOID }, TAG_GLOBAL, true },
+	{ "clamp", TYPE_UINT, { TYPE_UINT, TYPE_UINT, TYPE_UINT, TYPE_VOID }, { "x", "minVal", "maxVal" }, TAG_GLOBAL, true },
+	{ "clamp", TYPE_UVEC2, { TYPE_UVEC2, TYPE_UVEC2, TYPE_UVEC2, TYPE_VOID }, { "x", "minVal", "maxVal" }, TAG_GLOBAL, true },
+	{ "clamp", TYPE_UVEC3, { TYPE_UVEC3, TYPE_UVEC3, TYPE_UVEC3, TYPE_VOID }, { "x", "minVal", "maxVal" }, TAG_GLOBAL, true },
+	{ "clamp", TYPE_UVEC4, { TYPE_UVEC4, TYPE_UVEC4, TYPE_UVEC4, TYPE_VOID }, { "x", "minVal", "maxVal" }, TAG_GLOBAL, true },
+	{ "clamp", TYPE_UVEC2, { TYPE_UVEC2, TYPE_UINT, TYPE_UINT, TYPE_VOID }, { "x", "minVal", "maxVal" }, TAG_GLOBAL, true },
+	{ "clamp", TYPE_UVEC3, { TYPE_UVEC3, TYPE_UINT, TYPE_UINT, TYPE_VOID }, { "x", "minVal", "maxVal" }, TAG_GLOBAL, true },
+	{ "clamp", TYPE_UVEC4, { TYPE_UVEC4, TYPE_UINT, TYPE_UINT, TYPE_VOID }, { "x", "minVal", "maxVal" }, TAG_GLOBAL, true },
 
-	{ "mix", TYPE_FLOAT, { TYPE_FLOAT, TYPE_FLOAT, TYPE_FLOAT, TYPE_VOID }, TAG_GLOBAL, false },
-	{ "mix", TYPE_VEC2, { TYPE_VEC2, TYPE_VEC2, TYPE_FLOAT, TYPE_VOID }, TAG_GLOBAL, false },
-	{ "mix", TYPE_VEC2, { TYPE_VEC2, TYPE_VEC2, TYPE_BVEC2, TYPE_VOID }, TAG_GLOBAL, false },
-	{ "mix", TYPE_VEC2, { TYPE_VEC2, TYPE_VEC2, TYPE_VEC2, TYPE_VOID }, TAG_GLOBAL, false },
-	{ "mix", TYPE_VEC3, { TYPE_VEC3, TYPE_VEC3, TYPE_FLOAT, TYPE_VOID }, TAG_GLOBAL, false },
-	{ "mix", TYPE_VEC3, { TYPE_VEC3, TYPE_VEC3, TYPE_BVEC3, TYPE_VOID }, TAG_GLOBAL, false },
-	{ "mix", TYPE_VEC3, { TYPE_VEC3, TYPE_VEC3, TYPE_VEC3, TYPE_VOID }, TAG_GLOBAL, false },
-	{ "mix", TYPE_VEC4, { TYPE_VEC4, TYPE_VEC4, TYPE_FLOAT, TYPE_VOID }, TAG_GLOBAL, false },
-	{ "mix", TYPE_VEC4, { TYPE_VEC4, TYPE_VEC4, TYPE_BVEC4, TYPE_VOID }, TAG_GLOBAL, false },
-	{ "mix", TYPE_VEC4, { TYPE_VEC4, TYPE_VEC4, TYPE_VEC4, TYPE_VOID }, TAG_GLOBAL, false },
+	{ "mix", TYPE_FLOAT, { TYPE_FLOAT, TYPE_FLOAT, TYPE_FLOAT, TYPE_VOID }, { "a", "b", "value" }, TAG_GLOBAL, false },
+	{ "mix", TYPE_VEC2, { TYPE_VEC2, TYPE_VEC2, TYPE_FLOAT, TYPE_VOID }, { "a", "b", "value" }, TAG_GLOBAL, false },
+	{ "mix", TYPE_VEC2, { TYPE_VEC2, TYPE_VEC2, TYPE_BVEC2, TYPE_VOID }, { "a", "b", "value" }, TAG_GLOBAL, false },
+	{ "mix", TYPE_VEC2, { TYPE_VEC2, TYPE_VEC2, TYPE_VEC2, TYPE_VOID }, { "a", "b", "value" }, TAG_GLOBAL, false },
+	{ "mix", TYPE_VEC3, { TYPE_VEC3, TYPE_VEC3, TYPE_FLOAT, TYPE_VOID }, { "a", "b", "value" }, TAG_GLOBAL, false },
+	{ "mix", TYPE_VEC3, { TYPE_VEC3, TYPE_VEC3, TYPE_BVEC3, TYPE_VOID }, { "a", "b", "value" }, TAG_GLOBAL, false },
+	{ "mix", TYPE_VEC3, { TYPE_VEC3, TYPE_VEC3, TYPE_VEC3, TYPE_VOID }, { "a", "b", "value" }, TAG_GLOBAL, false },
+	{ "mix", TYPE_VEC4, { TYPE_VEC4, TYPE_VEC4, TYPE_FLOAT, TYPE_VOID }, { "a", "b", "value" }, TAG_GLOBAL, false },
+	{ "mix", TYPE_VEC4, { TYPE_VEC4, TYPE_VEC4, TYPE_BVEC4, TYPE_VOID }, { "a", "b", "value" }, TAG_GLOBAL, false },
+	{ "mix", TYPE_VEC4, { TYPE_VEC4, TYPE_VEC4, TYPE_VEC4, TYPE_VOID }, { "a", "b", "value" }, TAG_GLOBAL, false },
 
-	{ "step", TYPE_FLOAT, { TYPE_FLOAT, TYPE_FLOAT, TYPE_VOID }, TAG_GLOBAL, false },
-	{ "step", TYPE_VEC2, { TYPE_VEC2, TYPE_VEC2, TYPE_VOID }, TAG_GLOBAL, false },
-	{ "step", TYPE_VEC3, { TYPE_VEC3, TYPE_VEC3, TYPE_VOID }, TAG_GLOBAL, false },
-	{ "step", TYPE_VEC4, { TYPE_VEC4, TYPE_VEC4, TYPE_VOID }, TAG_GLOBAL, false },
-	{ "step", TYPE_VEC2, { TYPE_FLOAT, TYPE_VEC2, TYPE_VOID }, TAG_GLOBAL, false },
-	{ "step", TYPE_VEC3, { TYPE_FLOAT, TYPE_VEC3, TYPE_VOID }, TAG_GLOBAL, false },
-	{ "step", TYPE_VEC4, { TYPE_FLOAT, TYPE_VEC4, TYPE_VOID }, TAG_GLOBAL, false },
-	{ "smoothstep", TYPE_FLOAT, { TYPE_FLOAT, TYPE_FLOAT, TYPE_FLOAT, TYPE_VOID }, TAG_GLOBAL, false },
-	{ "smoothstep", TYPE_VEC2, { TYPE_VEC2, TYPE_VEC2, TYPE_VEC2, TYPE_VOID }, TAG_GLOBAL, false },
-	{ "smoothstep", TYPE_VEC3, { TYPE_VEC3, TYPE_VEC3, TYPE_VEC3, TYPE_VOID }, TAG_GLOBAL, false },
-	{ "smoothstep", TYPE_VEC4, { TYPE_VEC4, TYPE_VEC4, TYPE_VEC4, TYPE_VOID }, TAG_GLOBAL, false },
-	{ "smoothstep", TYPE_VEC2, { TYPE_FLOAT, TYPE_FLOAT, TYPE_VEC2, TYPE_VOID }, TAG_GLOBAL, false },
-	{ "smoothstep", TYPE_VEC3, { TYPE_FLOAT, TYPE_FLOAT, TYPE_VEC3, TYPE_VOID }, TAG_GLOBAL, false },
-	{ "smoothstep", TYPE_VEC4, { TYPE_FLOAT, TYPE_FLOAT, TYPE_VEC4, TYPE_VOID }, TAG_GLOBAL, false },
+	{ "step", TYPE_FLOAT, { TYPE_FLOAT, TYPE_FLOAT, TYPE_VOID }, { "edge", "x" }, TAG_GLOBAL, false },
+	{ "step", TYPE_VEC2, { TYPE_VEC2, TYPE_VEC2, TYPE_VOID }, { "edge", "x" }, TAG_GLOBAL, false },
+	{ "step", TYPE_VEC3, { TYPE_VEC3, TYPE_VEC3, TYPE_VOID }, { "edge", "x" }, TAG_GLOBAL, false },
+	{ "step", TYPE_VEC4, { TYPE_VEC4, TYPE_VEC4, TYPE_VOID }, { "edge", "x" }, TAG_GLOBAL, false },
+	{ "step", TYPE_VEC2, { TYPE_FLOAT, TYPE_VEC2, TYPE_VOID }, { "edge", "x" }, TAG_GLOBAL, false },
+	{ "step", TYPE_VEC3, { TYPE_FLOAT, TYPE_VEC3, TYPE_VOID }, { "edge", "x" }, TAG_GLOBAL, false },
+	{ "step", TYPE_VEC4, { TYPE_FLOAT, TYPE_VEC4, TYPE_VOID }, { "edge", "x" }, TAG_GLOBAL, false },
+	{ "smoothstep", TYPE_FLOAT, { TYPE_FLOAT, TYPE_FLOAT, TYPE_FLOAT, TYPE_VOID }, { "edge0", "edge1", "value" }, TAG_GLOBAL, false },
+	{ "smoothstep", TYPE_VEC2, { TYPE_VEC2, TYPE_VEC2, TYPE_VEC2, TYPE_VOID }, { "edge0", "edge1", "value" }, TAG_GLOBAL, false },
+	{ "smoothstep", TYPE_VEC3, { TYPE_VEC3, TYPE_VEC3, TYPE_VEC3, TYPE_VOID }, { "edge0", "edge1", "value" }, TAG_GLOBAL, false },
+	{ "smoothstep", TYPE_VEC4, { TYPE_VEC4, TYPE_VEC4, TYPE_VEC4, TYPE_VOID }, { "edge0", "edge1", "value" }, TAG_GLOBAL, false },
+	{ "smoothstep", TYPE_VEC2, { TYPE_FLOAT, TYPE_FLOAT, TYPE_VEC2, TYPE_VOID }, { "edge0", "edge1", "value" }, TAG_GLOBAL, false },
+	{ "smoothstep", TYPE_VEC3, { TYPE_FLOAT, TYPE_FLOAT, TYPE_VEC3, TYPE_VOID }, { "edge0", "edge1", "value" }, TAG_GLOBAL, false },
+	{ "smoothstep", TYPE_VEC4, { TYPE_FLOAT, TYPE_FLOAT, TYPE_VEC4, TYPE_VOID }, { "edge0", "edge1", "value" }, TAG_GLOBAL, false },
 
-	{ "isnan", TYPE_BOOL, { TYPE_FLOAT, TYPE_VOID }, TAG_GLOBAL, false },
-	{ "isnan", TYPE_BVEC2, { TYPE_VEC2, TYPE_VOID }, TAG_GLOBAL, false },
-	{ "isnan", TYPE_BVEC3, { TYPE_VEC3, TYPE_VOID }, TAG_GLOBAL, false },
-	{ "isnan", TYPE_BVEC4, { TYPE_VEC4, TYPE_VOID }, TAG_GLOBAL, false },
+	{ "isnan", TYPE_BOOL, { TYPE_FLOAT, TYPE_VOID }, { "x" }, TAG_GLOBAL, false },
+	{ "isnan", TYPE_BVEC2, { TYPE_VEC2, TYPE_VOID }, { "x" }, TAG_GLOBAL, false },
+	{ "isnan", TYPE_BVEC3, { TYPE_VEC3, TYPE_VOID }, { "x" }, TAG_GLOBAL, false },
+	{ "isnan", TYPE_BVEC4, { TYPE_VEC4, TYPE_VOID }, { "x" }, TAG_GLOBAL, false },
 
-	{ "isinf", TYPE_BOOL, { TYPE_FLOAT, TYPE_VOID }, TAG_GLOBAL, false },
-	{ "isinf", TYPE_BVEC2, { TYPE_VEC2, TYPE_VOID }, TAG_GLOBAL, false },
-	{ "isinf", TYPE_BVEC3, { TYPE_VEC3, TYPE_VOID }, TAG_GLOBAL, false },
-	{ "isinf", TYPE_BVEC4, { TYPE_VEC4, TYPE_VOID }, TAG_GLOBAL, false },
+	{ "isinf", TYPE_BOOL, { TYPE_FLOAT, TYPE_VOID }, { "x" }, TAG_GLOBAL, false },
+	{ "isinf", TYPE_BVEC2, { TYPE_VEC2, TYPE_VOID }, { "x" }, TAG_GLOBAL, false },
+	{ "isinf", TYPE_BVEC3, { TYPE_VEC3, TYPE_VOID }, { "x" }, TAG_GLOBAL, false },
+	{ "isinf", TYPE_BVEC4, { TYPE_VEC4, TYPE_VOID }, { "x" }, TAG_GLOBAL, false },
 
-	{ "floatBitsToInt", TYPE_INT, { TYPE_FLOAT, TYPE_VOID }, TAG_GLOBAL, true },
-	{ "floatBitsToInt", TYPE_IVEC2, { TYPE_VEC2, TYPE_VOID }, TAG_GLOBAL, true },
-	{ "floatBitsToInt", TYPE_IVEC3, { TYPE_VEC3, TYPE_VOID }, TAG_GLOBAL, true },
-	{ "floatBitsToInt", TYPE_IVEC4, { TYPE_VEC4, TYPE_VOID }, TAG_GLOBAL, true },
+	{ "floatBitsToInt", TYPE_INT, { TYPE_FLOAT, TYPE_VOID }, { "x" }, TAG_GLOBAL, true },
+	{ "floatBitsToInt", TYPE_IVEC2, { TYPE_VEC2, TYPE_VOID }, { "x" }, TAG_GLOBAL, true },
+	{ "floatBitsToInt", TYPE_IVEC3, { TYPE_VEC3, TYPE_VOID }, { "x" }, TAG_GLOBAL, true },
+	{ "floatBitsToInt", TYPE_IVEC4, { TYPE_VEC4, TYPE_VOID }, { "x" }, TAG_GLOBAL, true },
 
-	{ "floatBitsToUint", TYPE_UINT, { TYPE_FLOAT, TYPE_VOID }, TAG_GLOBAL, true },
-	{ "floatBitsToUint", TYPE_UVEC2, { TYPE_VEC2, TYPE_VOID }, TAG_GLOBAL, true },
-	{ "floatBitsToUint", TYPE_UVEC3, { TYPE_VEC3, TYPE_VOID }, TAG_GLOBAL, true },
-	{ "floatBitsToUint", TYPE_UVEC4, { TYPE_VEC4, TYPE_VOID }, TAG_GLOBAL, true },
+	{ "floatBitsToUint", TYPE_UINT, { TYPE_FLOAT, TYPE_VOID }, { "x" }, TAG_GLOBAL, true },
+	{ "floatBitsToUint", TYPE_UVEC2, { TYPE_VEC2, TYPE_VOID }, { "x" }, TAG_GLOBAL, true },
+	{ "floatBitsToUint", TYPE_UVEC3, { TYPE_VEC3, TYPE_VOID }, { "x" }, TAG_GLOBAL, true },
+	{ "floatBitsToUint", TYPE_UVEC4, { TYPE_VEC4, TYPE_VOID }, { "x" }, TAG_GLOBAL, true },
 
-	{ "intBitsToFloat", TYPE_FLOAT, { TYPE_INT, TYPE_VOID }, TAG_GLOBAL, true },
-	{ "intBitsToFloat", TYPE_VEC2, { TYPE_IVEC2, TYPE_VOID }, TAG_GLOBAL, true },
-	{ "intBitsToFloat", TYPE_VEC3, { TYPE_IVEC3, TYPE_VOID }, TAG_GLOBAL, true },
-	{ "intBitsToFloat", TYPE_VEC4, { TYPE_IVEC4, TYPE_VOID }, TAG_GLOBAL, true },
+	{ "intBitsToFloat", TYPE_FLOAT, { TYPE_INT, TYPE_VOID }, { "x" }, TAG_GLOBAL, true },
+	{ "intBitsToFloat", TYPE_VEC2, { TYPE_IVEC2, TYPE_VOID }, { "x" }, TAG_GLOBAL, true },
+	{ "intBitsToFloat", TYPE_VEC3, { TYPE_IVEC3, TYPE_VOID }, { "x" }, TAG_GLOBAL, true },
+	{ "intBitsToFloat", TYPE_VEC4, { TYPE_IVEC4, TYPE_VOID }, { "x" }, TAG_GLOBAL, true },
 
-	{ "uintBitsToFloat", TYPE_FLOAT, { TYPE_UINT, TYPE_VOID }, TAG_GLOBAL, true },
-	{ "uintBitsToFloat", TYPE_VEC2, { TYPE_UVEC2, TYPE_VOID }, TAG_GLOBAL, true },
-	{ "uintBitsToFloat", TYPE_VEC3, { TYPE_UVEC3, TYPE_VOID }, TAG_GLOBAL, true },
-	{ "uintBitsToFloat", TYPE_VEC4, { TYPE_UVEC4, TYPE_VOID }, TAG_GLOBAL, true },
+	{ "uintBitsToFloat", TYPE_FLOAT, { TYPE_UINT, TYPE_VOID }, { "x" }, TAG_GLOBAL, true },
+	{ "uintBitsToFloat", TYPE_VEC2, { TYPE_UVEC2, TYPE_VOID }, { "x" }, TAG_GLOBAL, true },
+	{ "uintBitsToFloat", TYPE_VEC3, { TYPE_UVEC3, TYPE_VOID }, { "x" }, TAG_GLOBAL, true },
+	{ "uintBitsToFloat", TYPE_VEC4, { TYPE_UVEC4, TYPE_VOID }, { "x" }, TAG_GLOBAL, true },
 
 	//builtins - geometric
-	{ "length", TYPE_FLOAT, { TYPE_VEC2, TYPE_VOID }, TAG_GLOBAL, false },
-	{ "length", TYPE_FLOAT, { TYPE_VEC3, TYPE_VOID }, TAG_GLOBAL, false },
-	{ "length", TYPE_FLOAT, { TYPE_VEC4, TYPE_VOID }, TAG_GLOBAL, false },
-	{ "distance", TYPE_FLOAT, { TYPE_VEC2, TYPE_VEC2, TYPE_VOID }, TAG_GLOBAL, false },
-	{ "distance", TYPE_FLOAT, { TYPE_VEC3, TYPE_VEC3, TYPE_VOID }, TAG_GLOBAL, false },
-	{ "distance", TYPE_FLOAT, { TYPE_VEC4, TYPE_VEC4, TYPE_VOID }, TAG_GLOBAL, false },
-	{ "dot", TYPE_FLOAT, { TYPE_VEC2, TYPE_VEC2, TYPE_VOID }, TAG_GLOBAL, false },
-	{ "dot", TYPE_FLOAT, { TYPE_VEC3, TYPE_VEC3, TYPE_VOID }, TAG_GLOBAL, false },
-	{ "dot", TYPE_FLOAT, { TYPE_VEC4, TYPE_VEC4, TYPE_VOID }, TAG_GLOBAL, false },
-	{ "cross", TYPE_VEC3, { TYPE_VEC3, TYPE_VEC3, TYPE_VOID }, TAG_GLOBAL, false },
-	{ "normalize", TYPE_VEC2, { TYPE_VEC2, TYPE_VOID }, TAG_GLOBAL, false },
-	{ "normalize", TYPE_VEC3, { TYPE_VEC3, TYPE_VOID }, TAG_GLOBAL, false },
-	{ "normalize", TYPE_VEC4, { TYPE_VEC4, TYPE_VOID }, TAG_GLOBAL, false },
-	{ "reflect", TYPE_VEC3, { TYPE_VEC3, TYPE_VEC3, TYPE_VOID }, TAG_GLOBAL, false },
-	{ "refract", TYPE_VEC3, { TYPE_VEC3, TYPE_VEC3, TYPE_FLOAT, TYPE_VOID }, TAG_GLOBAL, false },
+	{ "length", TYPE_FLOAT, { TYPE_VEC2, TYPE_VOID }, { "x" }, TAG_GLOBAL, false },
+	{ "length", TYPE_FLOAT, { TYPE_VEC3, TYPE_VOID }, { "x" }, TAG_GLOBAL, false },
+	{ "length", TYPE_FLOAT, { TYPE_VEC4, TYPE_VOID }, { "x" }, TAG_GLOBAL, false },
+	{ "distance", TYPE_FLOAT, { TYPE_VEC2, TYPE_VEC2, TYPE_VOID }, { "a", "b" }, TAG_GLOBAL, false },
+	{ "distance", TYPE_FLOAT, { TYPE_VEC3, TYPE_VEC3, TYPE_VOID }, { "a", "b" }, TAG_GLOBAL, false },
+	{ "distance", TYPE_FLOAT, { TYPE_VEC4, TYPE_VEC4, TYPE_VOID }, { "a", "b" }, TAG_GLOBAL, false },
+	{ "dot", TYPE_FLOAT, { TYPE_VEC2, TYPE_VEC2, TYPE_VOID }, { "a", "b" }, TAG_GLOBAL, false },
+	{ "dot", TYPE_FLOAT, { TYPE_VEC3, TYPE_VEC3, TYPE_VOID }, { "a", "b" }, TAG_GLOBAL, false },
+	{ "dot", TYPE_FLOAT, { TYPE_VEC4, TYPE_VEC4, TYPE_VOID }, { "a", "b" }, TAG_GLOBAL, false },
+	{ "cross", TYPE_VEC3, { TYPE_VEC3, TYPE_VEC3, TYPE_VOID }, { "a", "b" }, TAG_GLOBAL, false },
+	{ "normalize", TYPE_VEC2, { TYPE_VEC2, TYPE_VOID }, { "v" }, TAG_GLOBAL, false },
+	{ "normalize", TYPE_VEC3, { TYPE_VEC3, TYPE_VOID }, { "v" }, TAG_GLOBAL, false },
+	{ "normalize", TYPE_VEC4, { TYPE_VEC4, TYPE_VOID }, { "v" }, TAG_GLOBAL, false },
+	{ "reflect", TYPE_VEC3, { TYPE_VEC3, TYPE_VEC3, TYPE_VOID }, { "I", "N" }, TAG_GLOBAL, false },
+	{ "refract", TYPE_VEC3, { TYPE_VEC3, TYPE_VEC3, TYPE_FLOAT, TYPE_VOID }, { "I", "N", "eta" }, TAG_GLOBAL, false },
 
-	{ "faceforward", TYPE_VEC2, { TYPE_VEC2, TYPE_VEC2, TYPE_VEC2, TYPE_VOID }, TAG_GLOBAL, false },
-	{ "faceforward", TYPE_VEC3, { TYPE_VEC3, TYPE_VEC3, TYPE_VEC3, TYPE_VOID }, TAG_GLOBAL, false },
-	{ "faceforward", TYPE_VEC4, { TYPE_VEC4, TYPE_VEC4, TYPE_VEC4, TYPE_VOID }, TAG_GLOBAL, false },
+	{ "faceforward", TYPE_VEC2, { TYPE_VEC2, TYPE_VEC2, TYPE_VEC2, TYPE_VOID }, { "N", "I", "Nref" }, TAG_GLOBAL, false },
+	{ "faceforward", TYPE_VEC3, { TYPE_VEC3, TYPE_VEC3, TYPE_VEC3, TYPE_VOID }, { "N", "I", "Nref" }, TAG_GLOBAL, false },
+	{ "faceforward", TYPE_VEC4, { TYPE_VEC4, TYPE_VEC4, TYPE_VEC4, TYPE_VOID }, { "N", "I", "Nref" }, TAG_GLOBAL, false },
 
-	{ "matrixCompMult", TYPE_MAT2, { TYPE_MAT2, TYPE_MAT2, TYPE_VOID }, TAG_GLOBAL, false },
-	{ "matrixCompMult", TYPE_MAT3, { TYPE_MAT3, TYPE_MAT3, TYPE_VOID }, TAG_GLOBAL, false },
-	{ "matrixCompMult", TYPE_MAT4, { TYPE_MAT4, TYPE_MAT4, TYPE_VOID }, TAG_GLOBAL, false },
+	{ "matrixCompMult", TYPE_MAT2, { TYPE_MAT2, TYPE_MAT2, TYPE_VOID }, { "a", "b" }, TAG_GLOBAL, false },
+	{ "matrixCompMult", TYPE_MAT3, { TYPE_MAT3, TYPE_MAT3, TYPE_VOID }, { "a", "b" }, TAG_GLOBAL, false },
+	{ "matrixCompMult", TYPE_MAT4, { TYPE_MAT4, TYPE_MAT4, TYPE_VOID }, { "a", "b" }, TAG_GLOBAL, false },
 
-	{ "outerProduct", TYPE_MAT2, { TYPE_VEC2, TYPE_VEC2, TYPE_VOID }, TAG_GLOBAL, false },
-	{ "outerProduct", TYPE_MAT3, { TYPE_VEC3, TYPE_VEC3, TYPE_VOID }, TAG_GLOBAL, false },
-	{ "outerProduct", TYPE_MAT4, { TYPE_VEC4, TYPE_VEC4, TYPE_VOID }, TAG_GLOBAL, false },
+	{ "outerProduct", TYPE_MAT2, { TYPE_VEC2, TYPE_VEC2, TYPE_VOID }, { "c", "r" }, TAG_GLOBAL, false },
+	{ "outerProduct", TYPE_MAT3, { TYPE_VEC3, TYPE_VEC3, TYPE_VOID }, { "c", "r" }, TAG_GLOBAL, false },
+	{ "outerProduct", TYPE_MAT4, { TYPE_VEC4, TYPE_VEC4, TYPE_VOID }, { "c", "r" }, TAG_GLOBAL, false },
 
-	{ "transpose", TYPE_MAT2, { TYPE_MAT2, TYPE_VOID }, TAG_GLOBAL, false },
-	{ "transpose", TYPE_MAT3, { TYPE_MAT3, TYPE_VOID }, TAG_GLOBAL, false },
-	{ "transpose", TYPE_MAT4, { TYPE_MAT4, TYPE_VOID }, TAG_GLOBAL, false },
+	{ "transpose", TYPE_MAT2, { TYPE_MAT2, TYPE_VOID }, { "m" }, TAG_GLOBAL, false },
+	{ "transpose", TYPE_MAT3, { TYPE_MAT3, TYPE_VOID }, { "m" }, TAG_GLOBAL, false },
+	{ "transpose", TYPE_MAT4, { TYPE_MAT4, TYPE_VOID }, { "m" }, TAG_GLOBAL, false },
 
-	{ "determinant", TYPE_FLOAT, { TYPE_MAT2, TYPE_VOID }, TAG_GLOBAL, false },
-	{ "determinant", TYPE_FLOAT, { TYPE_MAT3, TYPE_VOID }, TAG_GLOBAL, false },
-	{ "determinant", TYPE_FLOAT, { TYPE_MAT4, TYPE_VOID }, TAG_GLOBAL, false },
+	{ "determinant", TYPE_FLOAT, { TYPE_MAT2, TYPE_VOID }, { "m" }, TAG_GLOBAL, false },
+	{ "determinant", TYPE_FLOAT, { TYPE_MAT3, TYPE_VOID }, { "m" }, TAG_GLOBAL, false },
+	{ "determinant", TYPE_FLOAT, { TYPE_MAT4, TYPE_VOID }, { "m" }, TAG_GLOBAL, false },
 
-	{ "inverse", TYPE_MAT2, { TYPE_MAT2, TYPE_VOID }, TAG_GLOBAL, false },
-	{ "inverse", TYPE_MAT3, { TYPE_MAT3, TYPE_VOID }, TAG_GLOBAL, false },
-	{ "inverse", TYPE_MAT4, { TYPE_MAT4, TYPE_VOID }, TAG_GLOBAL, false },
+	{ "inverse", TYPE_MAT2, { TYPE_MAT2, TYPE_VOID }, { "m" }, TAG_GLOBAL, false },
+	{ "inverse", TYPE_MAT3, { TYPE_MAT3, TYPE_VOID }, { "m" }, TAG_GLOBAL, false },
+	{ "inverse", TYPE_MAT4, { TYPE_MAT4, TYPE_VOID }, { "m" }, TAG_GLOBAL, false },
 
-	{ "lessThan", TYPE_BVEC2, { TYPE_VEC2, TYPE_VEC2, TYPE_VOID }, TAG_GLOBAL, false },
-	{ "lessThan", TYPE_BVEC3, { TYPE_VEC3, TYPE_VEC3, TYPE_VOID }, TAG_GLOBAL, false },
-	{ "lessThan", TYPE_BVEC4, { TYPE_VEC4, TYPE_VEC4, TYPE_VOID }, TAG_GLOBAL, false },
+	{ "lessThan", TYPE_BVEC2, { TYPE_VEC2, TYPE_VEC2, TYPE_VOID }, { "a", "b" }, TAG_GLOBAL, false },
+	{ "lessThan", TYPE_BVEC3, { TYPE_VEC3, TYPE_VEC3, TYPE_VOID }, { "a", "b" }, TAG_GLOBAL, false },
+	{ "lessThan", TYPE_BVEC4, { TYPE_VEC4, TYPE_VEC4, TYPE_VOID }, { "a", "b" }, TAG_GLOBAL, false },
 
-	{ "lessThan", TYPE_BVEC2, { TYPE_IVEC2, TYPE_IVEC2, TYPE_VOID }, TAG_GLOBAL, false },
-	{ "lessThan", TYPE_BVEC3, { TYPE_IVEC3, TYPE_IVEC3, TYPE_VOID }, TAG_GLOBAL, false },
-	{ "lessThan", TYPE_BVEC4, { TYPE_IVEC4, TYPE_IVEC4, TYPE_VOID }, TAG_GLOBAL, false },
+	{ "lessThan", TYPE_BVEC2, { TYPE_IVEC2, TYPE_IVEC2, TYPE_VOID }, { "a", "b" }, TAG_GLOBAL, false },
+	{ "lessThan", TYPE_BVEC3, { TYPE_IVEC3, TYPE_IVEC3, TYPE_VOID }, { "a", "b" }, TAG_GLOBAL, false },
+	{ "lessThan", TYPE_BVEC4, { TYPE_IVEC4, TYPE_IVEC4, TYPE_VOID }, { "a", "b" }, TAG_GLOBAL, false },
 
-	{ "lessThan", TYPE_BVEC2, { TYPE_UVEC2, TYPE_UVEC2, TYPE_VOID }, TAG_GLOBAL, true },
-	{ "lessThan", TYPE_BVEC3, { TYPE_UVEC3, TYPE_UVEC3, TYPE_VOID }, TAG_GLOBAL, true },
-	{ "lessThan", TYPE_BVEC4, { TYPE_UVEC4, TYPE_UVEC4, TYPE_VOID }, TAG_GLOBAL, true },
+	{ "lessThan", TYPE_BVEC2, { TYPE_UVEC2, TYPE_UVEC2, TYPE_VOID }, { "a", "b" }, TAG_GLOBAL, true },
+	{ "lessThan", TYPE_BVEC3, { TYPE_UVEC3, TYPE_UVEC3, TYPE_VOID }, { "a", "b" }, TAG_GLOBAL, true },
+	{ "lessThan", TYPE_BVEC4, { TYPE_UVEC4, TYPE_UVEC4, TYPE_VOID }, { "a", "b" }, TAG_GLOBAL, true },
 
-	{ "greaterThan", TYPE_BVEC2, { TYPE_VEC2, TYPE_VEC2, TYPE_VOID }, TAG_GLOBAL, false },
-	{ "greaterThan", TYPE_BVEC3, { TYPE_VEC3, TYPE_VEC3, TYPE_VOID }, TAG_GLOBAL, false },
-	{ "greaterThan", TYPE_BVEC4, { TYPE_VEC4, TYPE_VEC4, TYPE_VOID }, TAG_GLOBAL, false },
+	{ "greaterThan", TYPE_BVEC2, { TYPE_VEC2, TYPE_VEC2, TYPE_VOID }, { "a", "b" }, TAG_GLOBAL, false },
+	{ "greaterThan", TYPE_BVEC3, { TYPE_VEC3, TYPE_VEC3, TYPE_VOID }, { "a", "b" }, TAG_GLOBAL, false },
+	{ "greaterThan", TYPE_BVEC4, { TYPE_VEC4, TYPE_VEC4, TYPE_VOID }, { "a", "b" }, TAG_GLOBAL, false },
 
-	{ "greaterThan", TYPE_BVEC2, { TYPE_IVEC2, TYPE_IVEC2, TYPE_VOID }, TAG_GLOBAL, false },
-	{ "greaterThan", TYPE_BVEC3, { TYPE_IVEC3, TYPE_IVEC3, TYPE_VOID }, TAG_GLOBAL, false },
-	{ "greaterThan", TYPE_BVEC4, { TYPE_IVEC4, TYPE_IVEC4, TYPE_VOID }, TAG_GLOBAL, false },
+	{ "greaterThan", TYPE_BVEC2, { TYPE_IVEC2, TYPE_IVEC2, TYPE_VOID }, { "a", "b" }, TAG_GLOBAL, false },
+	{ "greaterThan", TYPE_BVEC3, { TYPE_IVEC3, TYPE_IVEC3, TYPE_VOID }, { "a", "b" }, TAG_GLOBAL, false },
+	{ "greaterThan", TYPE_BVEC4, { TYPE_IVEC4, TYPE_IVEC4, TYPE_VOID }, { "a", "b" }, TAG_GLOBAL, false },
 
-	{ "greaterThan", TYPE_BVEC2, { TYPE_UVEC2, TYPE_UVEC2, TYPE_VOID }, TAG_GLOBAL, true },
-	{ "greaterThan", TYPE_BVEC3, { TYPE_UVEC3, TYPE_UVEC3, TYPE_VOID }, TAG_GLOBAL, true },
-	{ "greaterThan", TYPE_BVEC4, { TYPE_UVEC4, TYPE_UVEC4, TYPE_VOID }, TAG_GLOBAL, true },
+	{ "greaterThan", TYPE_BVEC2, { TYPE_UVEC2, TYPE_UVEC2, TYPE_VOID }, { "a", "b" }, TAG_GLOBAL, true },
+	{ "greaterThan", TYPE_BVEC3, { TYPE_UVEC3, TYPE_UVEC3, TYPE_VOID }, { "a", "b" }, TAG_GLOBAL, true },
+	{ "greaterThan", TYPE_BVEC4, { TYPE_UVEC4, TYPE_UVEC4, TYPE_VOID }, { "a", "b" }, TAG_GLOBAL, true },
 
-	{ "lessThanEqual", TYPE_BVEC2, { TYPE_VEC2, TYPE_VEC2, TYPE_VOID }, TAG_GLOBAL, false },
-	{ "lessThanEqual", TYPE_BVEC3, { TYPE_VEC3, TYPE_VEC3, TYPE_VOID }, TAG_GLOBAL, false },
-	{ "lessThanEqual", TYPE_BVEC4, { TYPE_VEC4, TYPE_VEC4, TYPE_VOID }, TAG_GLOBAL, false },
+	{ "lessThanEqual", TYPE_BVEC2, { TYPE_VEC2, TYPE_VEC2, TYPE_VOID }, { "a", "b" }, TAG_GLOBAL, false },
+	{ "lessThanEqual", TYPE_BVEC3, { TYPE_VEC3, TYPE_VEC3, TYPE_VOID }, { "a", "b" }, TAG_GLOBAL, false },
+	{ "lessThanEqual", TYPE_BVEC4, { TYPE_VEC4, TYPE_VEC4, TYPE_VOID }, { "a", "b" }, TAG_GLOBAL, false },
 
-	{ "lessThanEqual", TYPE_BVEC2, { TYPE_IVEC2, TYPE_IVEC2, TYPE_VOID }, TAG_GLOBAL, false },
-	{ "lessThanEqual", TYPE_BVEC3, { TYPE_IVEC3, TYPE_IVEC3, TYPE_VOID }, TAG_GLOBAL, false },
-	{ "lessThanEqual", TYPE_BVEC4, { TYPE_IVEC4, TYPE_IVEC4, TYPE_VOID }, TAG_GLOBAL, false },
+	{ "lessThanEqual", TYPE_BVEC2, { TYPE_IVEC2, TYPE_IVEC2, TYPE_VOID }, { "a", "b" }, TAG_GLOBAL, false },
+	{ "lessThanEqual", TYPE_BVEC3, { TYPE_IVEC3, TYPE_IVEC3, TYPE_VOID }, { "a", "b" }, TAG_GLOBAL, false },
+	{ "lessThanEqual", TYPE_BVEC4, { TYPE_IVEC4, TYPE_IVEC4, TYPE_VOID }, { "a", "b" }, TAG_GLOBAL, false },
 
-	{ "lessThanEqual", TYPE_BVEC2, { TYPE_UVEC2, TYPE_UVEC2, TYPE_VOID }, TAG_GLOBAL, true },
-	{ "lessThanEqual", TYPE_BVEC3, { TYPE_UVEC3, TYPE_UVEC3, TYPE_VOID }, TAG_GLOBAL, true },
-	{ "lessThanEqual", TYPE_BVEC4, { TYPE_UVEC4, TYPE_UVEC4, TYPE_VOID }, TAG_GLOBAL, true },
+	{ "lessThanEqual", TYPE_BVEC2, { TYPE_UVEC2, TYPE_UVEC2, TYPE_VOID }, { "a", "b" }, TAG_GLOBAL, true },
+	{ "lessThanEqual", TYPE_BVEC3, { TYPE_UVEC3, TYPE_UVEC3, TYPE_VOID }, { "a", "b" }, TAG_GLOBAL, true },
+	{ "lessThanEqual", TYPE_BVEC4, { TYPE_UVEC4, TYPE_UVEC4, TYPE_VOID }, { "a", "b" }, TAG_GLOBAL, true },
 
-	{ "greaterThanEqual", TYPE_BVEC2, { TYPE_VEC2, TYPE_VEC2, TYPE_VOID }, TAG_GLOBAL, false },
-	{ "greaterThanEqual", TYPE_BVEC3, { TYPE_VEC3, TYPE_VEC3, TYPE_VOID }, TAG_GLOBAL, false },
-	{ "greaterThanEqual", TYPE_BVEC4, { TYPE_VEC4, TYPE_VEC4, TYPE_VOID }, TAG_GLOBAL, false },
+	{ "greaterThanEqual", TYPE_BVEC2, { TYPE_VEC2, TYPE_VEC2, TYPE_VOID }, { "a", "b" }, TAG_GLOBAL, false },
+	{ "greaterThanEqual", TYPE_BVEC3, { TYPE_VEC3, TYPE_VEC3, TYPE_VOID }, { "a", "b" }, TAG_GLOBAL, false },
+	{ "greaterThanEqual", TYPE_BVEC4, { TYPE_VEC4, TYPE_VEC4, TYPE_VOID }, { "a", "b" }, TAG_GLOBAL, false },
 
-	{ "greaterThanEqual", TYPE_BVEC2, { TYPE_IVEC2, TYPE_IVEC2, TYPE_VOID }, TAG_GLOBAL, false },
-	{ "greaterThanEqual", TYPE_BVEC3, { TYPE_IVEC3, TYPE_IVEC3, TYPE_VOID }, TAG_GLOBAL, false },
-	{ "greaterThanEqual", TYPE_BVEC4, { TYPE_IVEC4, TYPE_IVEC4, TYPE_VOID }, TAG_GLOBAL, false },
+	{ "greaterThanEqual", TYPE_BVEC2, { TYPE_IVEC2, TYPE_IVEC2, TYPE_VOID }, { "a", "b" }, TAG_GLOBAL, false },
+	{ "greaterThanEqual", TYPE_BVEC3, { TYPE_IVEC3, TYPE_IVEC3, TYPE_VOID }, { "a", "b" }, TAG_GLOBAL, false },
+	{ "greaterThanEqual", TYPE_BVEC4, { TYPE_IVEC4, TYPE_IVEC4, TYPE_VOID }, { "a", "b" }, TAG_GLOBAL, false },
 
-	{ "greaterThanEqual", TYPE_BVEC2, { TYPE_UVEC2, TYPE_UVEC2, TYPE_VOID }, TAG_GLOBAL, true },
-	{ "greaterThanEqual", TYPE_BVEC3, { TYPE_UVEC3, TYPE_UVEC3, TYPE_VOID }, TAG_GLOBAL, true },
-	{ "greaterThanEqual", TYPE_BVEC4, { TYPE_UVEC4, TYPE_UVEC4, TYPE_VOID }, TAG_GLOBAL, true },
+	{ "greaterThanEqual", TYPE_BVEC2, { TYPE_UVEC2, TYPE_UVEC2, TYPE_VOID }, { "a", "b" }, TAG_GLOBAL, true },
+	{ "greaterThanEqual", TYPE_BVEC3, { TYPE_UVEC3, TYPE_UVEC3, TYPE_VOID }, { "a", "b" }, TAG_GLOBAL, true },
+	{ "greaterThanEqual", TYPE_BVEC4, { TYPE_UVEC4, TYPE_UVEC4, TYPE_VOID }, { "a", "b" }, TAG_GLOBAL, true },
 
-	{ "equal", TYPE_BVEC2, { TYPE_VEC2, TYPE_VEC2, TYPE_VOID }, TAG_GLOBAL, false },
-	{ "equal", TYPE_BVEC3, { TYPE_VEC3, TYPE_VEC3, TYPE_VOID }, TAG_GLOBAL, false },
-	{ "equal", TYPE_BVEC4, { TYPE_VEC4, TYPE_VEC4, TYPE_VOID }, TAG_GLOBAL, false },
+	{ "equal", TYPE_BVEC2, { TYPE_VEC2, TYPE_VEC2, TYPE_VOID }, { "a", "b" }, TAG_GLOBAL, false },
+	{ "equal", TYPE_BVEC3, { TYPE_VEC3, TYPE_VEC3, TYPE_VOID }, { "a", "b" }, TAG_GLOBAL, false },
+	{ "equal", TYPE_BVEC4, { TYPE_VEC4, TYPE_VEC4, TYPE_VOID }, { "a", "b" }, TAG_GLOBAL, false },
 
-	{ "equal", TYPE_BVEC2, { TYPE_IVEC2, TYPE_IVEC2, TYPE_VOID }, TAG_GLOBAL, false },
-	{ "equal", TYPE_BVEC3, { TYPE_IVEC3, TYPE_IVEC3, TYPE_VOID }, TAG_GLOBAL, false },
-	{ "equal", TYPE_BVEC4, { TYPE_IVEC4, TYPE_IVEC4, TYPE_VOID }, TAG_GLOBAL, false },
+	{ "equal", TYPE_BVEC2, { TYPE_IVEC2, TYPE_IVEC2, TYPE_VOID }, { "a", "b" }, TAG_GLOBAL, false },
+	{ "equal", TYPE_BVEC3, { TYPE_IVEC3, TYPE_IVEC3, TYPE_VOID }, { "a", "b" }, TAG_GLOBAL, false },
+	{ "equal", TYPE_BVEC4, { TYPE_IVEC4, TYPE_IVEC4, TYPE_VOID }, { "a", "b" }, TAG_GLOBAL, false },
 
-	{ "equal", TYPE_BVEC2, { TYPE_UVEC2, TYPE_UVEC2, TYPE_VOID }, TAG_GLOBAL, true },
-	{ "equal", TYPE_BVEC3, { TYPE_UVEC3, TYPE_UVEC3, TYPE_VOID }, TAG_GLOBAL, true },
-	{ "equal", TYPE_BVEC4, { TYPE_UVEC4, TYPE_UVEC4, TYPE_VOID }, TAG_GLOBAL, true },
+	{ "equal", TYPE_BVEC2, { TYPE_UVEC2, TYPE_UVEC2, TYPE_VOID }, { "a", "b" }, TAG_GLOBAL, true },
+	{ "equal", TYPE_BVEC3, { TYPE_UVEC3, TYPE_UVEC3, TYPE_VOID }, { "a", "b" }, TAG_GLOBAL, true },
+	{ "equal", TYPE_BVEC4, { TYPE_UVEC4, TYPE_UVEC4, TYPE_VOID }, { "a", "b" }, TAG_GLOBAL, true },
 
-	{ "equal", TYPE_BVEC2, { TYPE_BVEC2, TYPE_BVEC2, TYPE_VOID }, TAG_GLOBAL, false },
-	{ "equal", TYPE_BVEC3, { TYPE_BVEC3, TYPE_BVEC3, TYPE_VOID }, TAG_GLOBAL, false },
-	{ "equal", TYPE_BVEC4, { TYPE_BVEC4, TYPE_BVEC4, TYPE_VOID }, TAG_GLOBAL, false },
+	{ "equal", TYPE_BVEC2, { TYPE_BVEC2, TYPE_BVEC2, TYPE_VOID }, { "a", "b" }, TAG_GLOBAL, false },
+	{ "equal", TYPE_BVEC3, { TYPE_BVEC3, TYPE_BVEC3, TYPE_VOID }, { "a", "b" }, TAG_GLOBAL, false },
+	{ "equal", TYPE_BVEC4, { TYPE_BVEC4, TYPE_BVEC4, TYPE_VOID }, { "a", "b" }, TAG_GLOBAL, false },
 
-	{ "notEqual", TYPE_BVEC2, { TYPE_VEC2, TYPE_VEC2, TYPE_VOID }, TAG_GLOBAL, false },
-	{ "notEqual", TYPE_BVEC3, { TYPE_VEC3, TYPE_VEC3, TYPE_VOID }, TAG_GLOBAL, false },
-	{ "notEqual", TYPE_BVEC4, { TYPE_VEC4, TYPE_VEC4, TYPE_VOID }, TAG_GLOBAL, false },
+	{ "notEqual", TYPE_BVEC2, { TYPE_VEC2, TYPE_VEC2, TYPE_VOID }, { "a", "b" }, TAG_GLOBAL, false },
+	{ "notEqual", TYPE_BVEC3, { TYPE_VEC3, TYPE_VEC3, TYPE_VOID }, { "a", "b" }, TAG_GLOBAL, false },
+	{ "notEqual", TYPE_BVEC4, { TYPE_VEC4, TYPE_VEC4, TYPE_VOID }, { "a", "b" }, TAG_GLOBAL, false },
 
-	{ "notEqual", TYPE_BVEC2, { TYPE_IVEC2, TYPE_IVEC2, TYPE_VOID }, TAG_GLOBAL, false },
-	{ "notEqual", TYPE_BVEC3, { TYPE_IVEC3, TYPE_IVEC3, TYPE_VOID }, TAG_GLOBAL, false },
-	{ "notEqual", TYPE_BVEC4, { TYPE_IVEC4, TYPE_IVEC4, TYPE_VOID }, TAG_GLOBAL, false },
+	{ "notEqual", TYPE_BVEC2, { TYPE_IVEC2, TYPE_IVEC2, TYPE_VOID }, { "a", "b" }, TAG_GLOBAL, false },
+	{ "notEqual", TYPE_BVEC3, { TYPE_IVEC3, TYPE_IVEC3, TYPE_VOID }, { "a", "b" }, TAG_GLOBAL, false },
+	{ "notEqual", TYPE_BVEC4, { TYPE_IVEC4, TYPE_IVEC4, TYPE_VOID }, { "a", "b" }, TAG_GLOBAL, false },
 
-	{ "notEqual", TYPE_BVEC2, { TYPE_UVEC2, TYPE_UVEC2, TYPE_VOID }, TAG_GLOBAL, true },
-	{ "notEqual", TYPE_BVEC3, { TYPE_UVEC3, TYPE_UVEC3, TYPE_VOID }, TAG_GLOBAL, true },
-	{ "notEqual", TYPE_BVEC4, { TYPE_UVEC4, TYPE_UVEC4, TYPE_VOID }, TAG_GLOBAL, true },
+	{ "notEqual", TYPE_BVEC2, { TYPE_UVEC2, TYPE_UVEC2, TYPE_VOID }, { "a", "b" }, TAG_GLOBAL, true },
+	{ "notEqual", TYPE_BVEC3, { TYPE_UVEC3, TYPE_UVEC3, TYPE_VOID }, { "a", "b" }, TAG_GLOBAL, true },
+	{ "notEqual", TYPE_BVEC4, { TYPE_UVEC4, TYPE_UVEC4, TYPE_VOID }, { "a", "b" }, TAG_GLOBAL, true },
 
-	{ "notEqual", TYPE_BVEC2, { TYPE_BVEC2, TYPE_BVEC2, TYPE_VOID }, TAG_GLOBAL, false },
-	{ "notEqual", TYPE_BVEC3, { TYPE_BVEC3, TYPE_BVEC3, TYPE_VOID }, TAG_GLOBAL, false },
-	{ "notEqual", TYPE_BVEC4, { TYPE_BVEC4, TYPE_BVEC4, TYPE_VOID }, TAG_GLOBAL, false },
+	{ "notEqual", TYPE_BVEC2, { TYPE_BVEC2, TYPE_BVEC2, TYPE_VOID }, { "a", "b" }, TAG_GLOBAL, false },
+	{ "notEqual", TYPE_BVEC3, { TYPE_BVEC3, TYPE_BVEC3, TYPE_VOID }, { "a", "b" }, TAG_GLOBAL, false },
+	{ "notEqual", TYPE_BVEC4, { TYPE_BVEC4, TYPE_BVEC4, TYPE_VOID }, { "a", "b" }, TAG_GLOBAL, false },
 
-	{ "any", TYPE_BOOL, { TYPE_BVEC2, TYPE_VOID }, TAG_GLOBAL, false },
-	{ "any", TYPE_BOOL, { TYPE_BVEC3, TYPE_VOID }, TAG_GLOBAL, false },
-	{ "any", TYPE_BOOL, { TYPE_BVEC4, TYPE_VOID }, TAG_GLOBAL, false },
+	{ "any", TYPE_BOOL, { TYPE_BVEC2, TYPE_VOID }, { "x" }, TAG_GLOBAL, false },
+	{ "any", TYPE_BOOL, { TYPE_BVEC3, TYPE_VOID }, { "x" }, TAG_GLOBAL, false },
+	{ "any", TYPE_BOOL, { TYPE_BVEC4, TYPE_VOID }, { "x" }, TAG_GLOBAL, false },
 
-	{ "all", TYPE_BOOL, { TYPE_BVEC2, TYPE_VOID }, TAG_GLOBAL, false },
-	{ "all", TYPE_BOOL, { TYPE_BVEC3, TYPE_VOID }, TAG_GLOBAL, false },
-	{ "all", TYPE_BOOL, { TYPE_BVEC4, TYPE_VOID }, TAG_GLOBAL, false },
+	{ "all", TYPE_BOOL, { TYPE_BVEC2, TYPE_VOID }, { "x" }, TAG_GLOBAL, false },
+	{ "all", TYPE_BOOL, { TYPE_BVEC3, TYPE_VOID }, { "x" }, TAG_GLOBAL, false },
+	{ "all", TYPE_BOOL, { TYPE_BVEC4, TYPE_VOID }, { "x" }, TAG_GLOBAL, false },
 
-	{ "not", TYPE_BVEC2, { TYPE_BVEC2, TYPE_VOID }, TAG_GLOBAL, false },
-	{ "not", TYPE_BVEC3, { TYPE_BVEC3, TYPE_VOID }, TAG_GLOBAL, false },
-	{ "not", TYPE_BVEC4, { TYPE_BVEC4, TYPE_VOID }, TAG_GLOBAL, false },
+	{ "not", TYPE_BVEC2, { TYPE_BVEC2, TYPE_VOID }, { "x" }, TAG_GLOBAL, false },
+	{ "not", TYPE_BVEC3, { TYPE_BVEC3, TYPE_VOID }, { "x" }, TAG_GLOBAL, false },
+	{ "not", TYPE_BVEC4, { TYPE_BVEC4, TYPE_VOID }, { "x" }, TAG_GLOBAL, false },
 
 	//builtins - texture
-	{ "textureSize", TYPE_IVEC2, { TYPE_SAMPLER2D, TYPE_INT, TYPE_VOID }, TAG_GLOBAL, true },
-	{ "textureSize", TYPE_IVEC2, { TYPE_ISAMPLER2D, TYPE_INT, TYPE_VOID }, TAG_GLOBAL, true },
-	{ "textureSize", TYPE_IVEC2, { TYPE_USAMPLER2D, TYPE_INT, TYPE_VOID }, TAG_GLOBAL, true },
-	{ "textureSize", TYPE_IVEC3, { TYPE_SAMPLER2DARRAY, TYPE_INT, TYPE_VOID }, TAG_GLOBAL, true },
-	{ "textureSize", TYPE_IVEC3, { TYPE_ISAMPLER2DARRAY, TYPE_INT, TYPE_VOID }, TAG_GLOBAL, true },
-	{ "textureSize", TYPE_IVEC3, { TYPE_USAMPLER2DARRAY, TYPE_INT, TYPE_VOID }, TAG_GLOBAL, true },
-	{ "textureSize", TYPE_IVEC3, { TYPE_SAMPLER3D, TYPE_INT, TYPE_VOID }, TAG_GLOBAL, true },
-	{ "textureSize", TYPE_IVEC3, { TYPE_ISAMPLER3D, TYPE_INT, TYPE_VOID }, TAG_GLOBAL, true },
-	{ "textureSize", TYPE_IVEC3, { TYPE_USAMPLER3D, TYPE_INT, TYPE_VOID }, TAG_GLOBAL, true },
-	{ "textureSize", TYPE_IVEC2, { TYPE_SAMPLERCUBE, TYPE_INT, TYPE_VOID }, TAG_GLOBAL, true },
-	{ "textureSize", TYPE_IVEC2, { TYPE_SAMPLERCUBEARRAY, TYPE_INT, TYPE_VOID }, TAG_GLOBAL, true },
+	{ "textureSize", TYPE_IVEC2, { TYPE_SAMPLER2D, TYPE_INT, TYPE_VOID }, { "sampler", "lod" }, TAG_GLOBAL, true },
+	{ "textureSize", TYPE_IVEC2, { TYPE_ISAMPLER2D, TYPE_INT, TYPE_VOID }, { "sampler", "lod" }, TAG_GLOBAL, true },
+	{ "textureSize", TYPE_IVEC2, { TYPE_USAMPLER2D, TYPE_INT, TYPE_VOID }, { "sampler", "lod" }, TAG_GLOBAL, true },
+	{ "textureSize", TYPE_IVEC3, { TYPE_SAMPLER2DARRAY, TYPE_INT, TYPE_VOID }, { "sampler", "lod" }, TAG_GLOBAL, true },
+	{ "textureSize", TYPE_IVEC3, { TYPE_ISAMPLER2DARRAY, TYPE_INT, TYPE_VOID }, { "sampler", "lod" }, TAG_GLOBAL, true },
+	{ "textureSize", TYPE_IVEC3, { TYPE_USAMPLER2DARRAY, TYPE_INT, TYPE_VOID }, { "sampler", "lod" }, TAG_GLOBAL, true },
+	{ "textureSize", TYPE_IVEC3, { TYPE_SAMPLER3D, TYPE_INT, TYPE_VOID }, { "sampler", "lod" }, TAG_GLOBAL, true },
+	{ "textureSize", TYPE_IVEC3, { TYPE_ISAMPLER3D, TYPE_INT, TYPE_VOID }, { "sampler", "lod" }, TAG_GLOBAL, true },
+	{ "textureSize", TYPE_IVEC3, { TYPE_USAMPLER3D, TYPE_INT, TYPE_VOID }, { "sampler", "lod" }, TAG_GLOBAL, true },
+	{ "textureSize", TYPE_IVEC2, { TYPE_SAMPLERCUBE, TYPE_INT, TYPE_VOID }, { "sampler", "lod" }, TAG_GLOBAL, true },
+	{ "textureSize", TYPE_IVEC2, { TYPE_SAMPLERCUBEARRAY, TYPE_INT, TYPE_VOID }, { "sampler", "lod" }, TAG_GLOBAL, true },
 
-	{ "texture", TYPE_VEC4, { TYPE_SAMPLER2D, TYPE_VEC2, TYPE_VOID }, TAG_GLOBAL, false },
-	{ "texture", TYPE_VEC4, { TYPE_SAMPLER2D, TYPE_VEC2, TYPE_FLOAT, TYPE_VOID }, TAG_GLOBAL, false },
-	{ "texture", TYPE_UVEC4, { TYPE_USAMPLER2D, TYPE_VEC2, TYPE_VOID }, TAG_GLOBAL, true },
-	{ "texture", TYPE_UVEC4, { TYPE_USAMPLER2D, TYPE_VEC2, TYPE_FLOAT, TYPE_VOID }, TAG_GLOBAL, true },
-	{ "texture", TYPE_IVEC4, { TYPE_ISAMPLER2D, TYPE_VEC2, TYPE_VOID }, TAG_GLOBAL, true },
-	{ "texture", TYPE_IVEC4, { TYPE_ISAMPLER2D, TYPE_VEC2, TYPE_FLOAT, TYPE_VOID }, TAG_GLOBAL, true },
-	{ "texture", TYPE_VEC4, { TYPE_SAMPLER2DARRAY, TYPE_VEC3, TYPE_VOID }, TAG_GLOBAL, false },
-	{ "texture", TYPE_VEC4, { TYPE_SAMPLER2DARRAY, TYPE_VEC3, TYPE_FLOAT, TYPE_VOID }, TAG_GLOBAL, false },
-	{ "texture", TYPE_UVEC4, { TYPE_USAMPLER2DARRAY, TYPE_VEC3, TYPE_VOID }, TAG_GLOBAL, true },
-	{ "texture", TYPE_UVEC4, { TYPE_USAMPLER2DARRAY, TYPE_VEC3, TYPE_FLOAT, TYPE_VOID }, TAG_GLOBAL, true },
-	{ "texture", TYPE_IVEC4, { TYPE_ISAMPLER2DARRAY, TYPE_VEC3, TYPE_VOID }, TAG_GLOBAL, true },
-	{ "texture", TYPE_IVEC4, { TYPE_ISAMPLER2DARRAY, TYPE_VEC3, TYPE_FLOAT, TYPE_VOID }, TAG_GLOBAL, true },
-	{ "texture", TYPE_VEC4, { TYPE_SAMPLER3D, TYPE_VEC3, TYPE_VOID }, TAG_GLOBAL, false },
-	{ "texture", TYPE_VEC4, { TYPE_SAMPLER3D, TYPE_VEC3, TYPE_FLOAT, TYPE_VOID }, TAG_GLOBAL, false },
-	{ "texture", TYPE_UVEC4, { TYPE_USAMPLER3D, TYPE_VEC3, TYPE_VOID }, TAG_GLOBAL, true },
-	{ "texture", TYPE_UVEC4, { TYPE_USAMPLER3D, TYPE_VEC3, TYPE_FLOAT, TYPE_VOID }, TAG_GLOBAL, true },
-	{ "texture", TYPE_IVEC4, { TYPE_ISAMPLER3D, TYPE_VEC3, TYPE_VOID }, TAG_GLOBAL, true },
-	{ "texture", TYPE_IVEC4, { TYPE_ISAMPLER3D, TYPE_VEC3, TYPE_FLOAT, TYPE_VOID }, TAG_GLOBAL, true },
-	{ "texture", TYPE_VEC4, { TYPE_SAMPLERCUBE, TYPE_VEC3, TYPE_VOID }, TAG_GLOBAL, false },
-	{ "texture", TYPE_VEC4, { TYPE_SAMPLERCUBE, TYPE_VEC3, TYPE_FLOAT, TYPE_VOID }, TAG_GLOBAL, false },
-	{ "texture", TYPE_VEC4, { TYPE_SAMPLERCUBEARRAY, TYPE_VEC4, TYPE_VOID }, TAG_GLOBAL, false },
-	{ "texture", TYPE_VEC4, { TYPE_SAMPLERCUBEARRAY, TYPE_VEC4, TYPE_FLOAT, TYPE_VOID }, TAG_GLOBAL, false },
+	{ "texture", TYPE_VEC4, { TYPE_SAMPLER2D, TYPE_VEC2, TYPE_VOID }, { "sampler", "coords" }, TAG_GLOBAL, false },
+	{ "texture", TYPE_VEC4, { TYPE_SAMPLER2D, TYPE_VEC2, TYPE_FLOAT, TYPE_VOID }, { "sampler", "coords", "bias" }, TAG_GLOBAL, false },
+	{ "texture", TYPE_UVEC4, { TYPE_USAMPLER2D, TYPE_VEC2, TYPE_VOID }, { "sampler", "coords" }, TAG_GLOBAL, true },
+	{ "texture", TYPE_UVEC4, { TYPE_USAMPLER2D, TYPE_VEC2, TYPE_FLOAT, TYPE_VOID }, { "sampler", "coords", "bias" }, TAG_GLOBAL, true },
+	{ "texture", TYPE_IVEC4, { TYPE_ISAMPLER2D, TYPE_VEC2, TYPE_VOID }, { "sampler", "coords" }, TAG_GLOBAL, true },
+	{ "texture", TYPE_IVEC4, { TYPE_ISAMPLER2D, TYPE_VEC2, TYPE_FLOAT, TYPE_VOID }, { "sampler", "coords", "bias" }, TAG_GLOBAL, true },
+	{ "texture", TYPE_VEC4, { TYPE_SAMPLER2DARRAY, TYPE_VEC3, TYPE_VOID }, { "sampler", "coords" }, TAG_GLOBAL, false },
+	{ "texture", TYPE_VEC4, { TYPE_SAMPLER2DARRAY, TYPE_VEC3, TYPE_FLOAT, TYPE_VOID }, { "sampler", "coords", "bias" }, TAG_GLOBAL, false },
+	{ "texture", TYPE_UVEC4, { TYPE_USAMPLER2DARRAY, TYPE_VEC3, TYPE_VOID }, { "sampler", "coords" }, TAG_GLOBAL, true },
+	{ "texture", TYPE_UVEC4, { TYPE_USAMPLER2DARRAY, TYPE_VEC3, TYPE_FLOAT, TYPE_VOID }, { "sampler", "coords", "bias" }, TAG_GLOBAL, true },
+	{ "texture", TYPE_IVEC4, { TYPE_ISAMPLER2DARRAY, TYPE_VEC3, TYPE_VOID }, { "sampler", "coords" }, TAG_GLOBAL, true },
+	{ "texture", TYPE_IVEC4, { TYPE_ISAMPLER2DARRAY, TYPE_VEC3, TYPE_FLOAT, TYPE_VOID }, { "sampler", "coords", "bias" }, TAG_GLOBAL, true },
+	{ "texture", TYPE_VEC4, { TYPE_SAMPLER3D, TYPE_VEC3, TYPE_VOID }, { "sampler", "coords" }, TAG_GLOBAL, false },
+	{ "texture", TYPE_VEC4, { TYPE_SAMPLER3D, TYPE_VEC3, TYPE_FLOAT, TYPE_VOID }, { "sampler", "coords", "bias" }, TAG_GLOBAL, false },
+	{ "texture", TYPE_UVEC4, { TYPE_USAMPLER3D, TYPE_VEC3, TYPE_VOID }, { "sampler", "coords" }, TAG_GLOBAL, true },
+	{ "texture", TYPE_UVEC4, { TYPE_USAMPLER3D, TYPE_VEC3, TYPE_FLOAT, TYPE_VOID }, { "sampler", "coords", "bias" }, TAG_GLOBAL, true },
+	{ "texture", TYPE_IVEC4, { TYPE_ISAMPLER3D, TYPE_VEC3, TYPE_VOID }, { "sampler", "coords" }, TAG_GLOBAL, true },
+	{ "texture", TYPE_IVEC4, { TYPE_ISAMPLER3D, TYPE_VEC3, TYPE_FLOAT, TYPE_VOID }, { "sampler", "coords", "bias" }, TAG_GLOBAL, true },
+	{ "texture", TYPE_VEC4, { TYPE_SAMPLERCUBE, TYPE_VEC3, TYPE_VOID }, { "sampler", "coords" }, TAG_GLOBAL, false },
+	{ "texture", TYPE_VEC4, { TYPE_SAMPLERCUBE, TYPE_VEC3, TYPE_FLOAT, TYPE_VOID }, { "sampler", "coords", "bias" }, TAG_GLOBAL, false },
+	{ "texture", TYPE_VEC4, { TYPE_SAMPLERCUBEARRAY, TYPE_VEC4, TYPE_VOID }, { "sampler", "coords" }, TAG_GLOBAL, false },
+	{ "texture", TYPE_VEC4, { TYPE_SAMPLERCUBEARRAY, TYPE_VEC4, TYPE_FLOAT, TYPE_VOID }, { "sampler", "coords", "bias" }, TAG_GLOBAL, false },
 
-	{ "textureProj", TYPE_VEC4, { TYPE_SAMPLER2D, TYPE_VEC3, TYPE_VOID }, TAG_GLOBAL, true },
-	{ "textureProj", TYPE_VEC4, { TYPE_SAMPLER2D, TYPE_VEC4, TYPE_VOID }, TAG_GLOBAL, true },
-	{ "textureProj", TYPE_VEC4, { TYPE_SAMPLER2D, TYPE_VEC3, TYPE_FLOAT, TYPE_VOID }, TAG_GLOBAL, true },
-	{ "textureProj", TYPE_VEC4, { TYPE_SAMPLER2D, TYPE_VEC4, TYPE_FLOAT, TYPE_VOID }, TAG_GLOBAL, true },
-	{ "textureProj", TYPE_IVEC4, { TYPE_ISAMPLER2D, TYPE_VEC3, TYPE_VOID }, TAG_GLOBAL, true },
-	{ "textureProj", TYPE_IVEC4, { TYPE_ISAMPLER2D, TYPE_VEC4, TYPE_VOID }, TAG_GLOBAL, true },
-	{ "textureProj", TYPE_IVEC4, { TYPE_ISAMPLER2D, TYPE_VEC3, TYPE_FLOAT, TYPE_VOID }, TAG_GLOBAL, true },
-	{ "textureProj", TYPE_IVEC4, { TYPE_ISAMPLER2D, TYPE_VEC4, TYPE_FLOAT, TYPE_VOID }, TAG_GLOBAL, true },
-	{ "textureProj", TYPE_UVEC4, { TYPE_USAMPLER2D, TYPE_VEC3, TYPE_VOID }, TAG_GLOBAL, true },
-	{ "textureProj", TYPE_UVEC4, { TYPE_USAMPLER2D, TYPE_VEC4, TYPE_VOID }, TAG_GLOBAL, true },
-	{ "textureProj", TYPE_UVEC4, { TYPE_USAMPLER2D, TYPE_VEC3, TYPE_FLOAT, TYPE_VOID }, TAG_GLOBAL, true },
-	{ "textureProj", TYPE_UVEC4, { TYPE_USAMPLER2D, TYPE_VEC4, TYPE_FLOAT, TYPE_VOID }, TAG_GLOBAL, true },
-	{ "textureProj", TYPE_VEC4, { TYPE_SAMPLER3D, TYPE_VEC4, TYPE_VOID }, TAG_GLOBAL, true },
-	{ "textureProj", TYPE_VEC4, { TYPE_SAMPLER3D, TYPE_VEC4, TYPE_FLOAT, TYPE_VOID }, TAG_GLOBAL, true },
-	{ "textureProj", TYPE_IVEC4, { TYPE_ISAMPLER3D, TYPE_VEC4, TYPE_VOID }, TAG_GLOBAL, true },
-	{ "textureProj", TYPE_IVEC4, { TYPE_ISAMPLER3D, TYPE_VEC4, TYPE_FLOAT, TYPE_VOID }, TAG_GLOBAL, true },
-	{ "textureProj", TYPE_UVEC4, { TYPE_USAMPLER3D, TYPE_VEC4, TYPE_VOID }, TAG_GLOBAL, true },
-	{ "textureProj", TYPE_UVEC4, { TYPE_USAMPLER3D, TYPE_VEC4, TYPE_FLOAT, TYPE_VOID }, TAG_GLOBAL, true },
+	{ "textureProj", TYPE_VEC4, { TYPE_SAMPLER2D, TYPE_VEC3, TYPE_VOID }, { "sampler", "coords" }, TAG_GLOBAL, true },
+	{ "textureProj", TYPE_VEC4, { TYPE_SAMPLER2D, TYPE_VEC4, TYPE_VOID }, { "sampler", "coords" }, TAG_GLOBAL, true },
+	{ "textureProj", TYPE_VEC4, { TYPE_SAMPLER2D, TYPE_VEC3, TYPE_FLOAT, TYPE_VOID }, { "sampler", "coords", "bias" }, TAG_GLOBAL, true },
+	{ "textureProj", TYPE_VEC4, { TYPE_SAMPLER2D, TYPE_VEC4, TYPE_FLOAT, TYPE_VOID }, { "sampler", "coords", "bias" }, TAG_GLOBAL, true },
+	{ "textureProj", TYPE_IVEC4, { TYPE_ISAMPLER2D, TYPE_VEC3, TYPE_VOID }, { "sampler", "coords" }, TAG_GLOBAL, true },
+	{ "textureProj", TYPE_IVEC4, { TYPE_ISAMPLER2D, TYPE_VEC4, TYPE_VOID }, { "sampler", "coords" }, TAG_GLOBAL, true },
+	{ "textureProj", TYPE_IVEC4, { TYPE_ISAMPLER2D, TYPE_VEC3, TYPE_FLOAT, TYPE_VOID }, { "sampler", "coords", "bias" }, TAG_GLOBAL, true },
+	{ "textureProj", TYPE_IVEC4, { TYPE_ISAMPLER2D, TYPE_VEC4, TYPE_FLOAT, TYPE_VOID }, { "sampler", "coords", "bias" }, TAG_GLOBAL, true },
+	{ "textureProj", TYPE_UVEC4, { TYPE_USAMPLER2D, TYPE_VEC3, TYPE_VOID }, { "sampler", "coords" }, TAG_GLOBAL, true },
+	{ "textureProj", TYPE_UVEC4, { TYPE_USAMPLER2D, TYPE_VEC4, TYPE_VOID }, { "sampler", "coords" }, TAG_GLOBAL, true },
+	{ "textureProj", TYPE_UVEC4, { TYPE_USAMPLER2D, TYPE_VEC3, TYPE_FLOAT, TYPE_VOID }, { "sampler", "coords", "bias" }, TAG_GLOBAL, true },
+	{ "textureProj", TYPE_UVEC4, { TYPE_USAMPLER2D, TYPE_VEC4, TYPE_FLOAT, TYPE_VOID }, { "sampler", "coords", "bias" }, TAG_GLOBAL, true },
+	{ "textureProj", TYPE_VEC4, { TYPE_SAMPLER3D, TYPE_VEC4, TYPE_VOID }, { "sampler", "coords" }, TAG_GLOBAL, true },
+	{ "textureProj", TYPE_VEC4, { TYPE_SAMPLER3D, TYPE_VEC4, TYPE_FLOAT, TYPE_VOID }, { "sampler", "coords", "bias" }, TAG_GLOBAL, true },
+	{ "textureProj", TYPE_IVEC4, { TYPE_ISAMPLER3D, TYPE_VEC4, TYPE_VOID }, { "sampler", "coords" }, TAG_GLOBAL, true },
+	{ "textureProj", TYPE_IVEC4, { TYPE_ISAMPLER3D, TYPE_VEC4, TYPE_FLOAT, TYPE_VOID }, { "sampler", "coords", "bias" }, TAG_GLOBAL, true },
+	{ "textureProj", TYPE_UVEC4, { TYPE_USAMPLER3D, TYPE_VEC4, TYPE_VOID }, { "sampler", "coords" }, TAG_GLOBAL, true },
+	{ "textureProj", TYPE_UVEC4, { TYPE_USAMPLER3D, TYPE_VEC4, TYPE_FLOAT, TYPE_VOID }, { "sampler", "coords", "bias" }, TAG_GLOBAL, true },
 
-	{ "textureLod", TYPE_VEC4, { TYPE_SAMPLER2D, TYPE_VEC2, TYPE_FLOAT, TYPE_VOID }, TAG_GLOBAL, false },
-	{ "textureLod", TYPE_IVEC4, { TYPE_ISAMPLER2D, TYPE_VEC2, TYPE_FLOAT, TYPE_VOID }, TAG_GLOBAL, true },
-	{ "textureLod", TYPE_UVEC4, { TYPE_USAMPLER2D, TYPE_VEC2, TYPE_FLOAT, TYPE_VOID }, TAG_GLOBAL, true },
-	{ "textureLod", TYPE_VEC4, { TYPE_SAMPLER2DARRAY, TYPE_VEC3, TYPE_FLOAT, TYPE_VOID }, TAG_GLOBAL, false },
-	{ "textureLod", TYPE_IVEC4, { TYPE_ISAMPLER2DARRAY, TYPE_VEC3, TYPE_FLOAT, TYPE_VOID }, TAG_GLOBAL, true },
-	{ "textureLod", TYPE_UVEC4, { TYPE_USAMPLER2DARRAY, TYPE_VEC3, TYPE_FLOAT, TYPE_VOID }, TAG_GLOBAL, true },
-	{ "textureLod", TYPE_VEC4, { TYPE_SAMPLER3D, TYPE_VEC3, TYPE_FLOAT, TYPE_VOID }, TAG_GLOBAL, false },
-	{ "textureLod", TYPE_IVEC4, { TYPE_ISAMPLER3D, TYPE_VEC3, TYPE_FLOAT, TYPE_VOID }, TAG_GLOBAL, true },
-	{ "textureLod", TYPE_UVEC4, { TYPE_USAMPLER3D, TYPE_VEC3, TYPE_FLOAT, TYPE_VOID }, TAG_GLOBAL, true },
-	{ "textureLod", TYPE_VEC4, { TYPE_SAMPLERCUBE, TYPE_VEC3, TYPE_FLOAT, TYPE_VOID }, TAG_GLOBAL, false },
-	{ "textureLod", TYPE_VEC4, { TYPE_SAMPLERCUBEARRAY, TYPE_VEC4, TYPE_FLOAT, TYPE_VOID }, TAG_GLOBAL, false },
+	{ "textureLod", TYPE_VEC4, { TYPE_SAMPLER2D, TYPE_VEC2, TYPE_FLOAT, TYPE_VOID }, { "sampler", "coords", "lod" }, TAG_GLOBAL, false },
+	{ "textureLod", TYPE_IVEC4, { TYPE_ISAMPLER2D, TYPE_VEC2, TYPE_FLOAT, TYPE_VOID }, { "sampler", "coords", "lod" }, TAG_GLOBAL, true },
+	{ "textureLod", TYPE_UVEC4, { TYPE_USAMPLER2D, TYPE_VEC2, TYPE_FLOAT, TYPE_VOID }, { "sampler", "coords", "lod" }, TAG_GLOBAL, true },
+	{ "textureLod", TYPE_VEC4, { TYPE_SAMPLER2DARRAY, TYPE_VEC3, TYPE_FLOAT, TYPE_VOID }, { "sampler", "coords", "lod" }, TAG_GLOBAL, false },
+	{ "textureLod", TYPE_IVEC4, { TYPE_ISAMPLER2DARRAY, TYPE_VEC3, TYPE_FLOAT, TYPE_VOID }, { "sampler", "coords", "lod" }, TAG_GLOBAL, true },
+	{ "textureLod", TYPE_UVEC4, { TYPE_USAMPLER2DARRAY, TYPE_VEC3, TYPE_FLOAT, TYPE_VOID }, { "sampler", "coords", "lod" }, TAG_GLOBAL, true },
+	{ "textureLod", TYPE_VEC4, { TYPE_SAMPLER3D, TYPE_VEC3, TYPE_FLOAT, TYPE_VOID }, { "sampler", "coords", "lod" }, TAG_GLOBAL, false },
+	{ "textureLod", TYPE_IVEC4, { TYPE_ISAMPLER3D, TYPE_VEC3, TYPE_FLOAT, TYPE_VOID }, { "sampler", "coords", "lod" }, TAG_GLOBAL, true },
+	{ "textureLod", TYPE_UVEC4, { TYPE_USAMPLER3D, TYPE_VEC3, TYPE_FLOAT, TYPE_VOID }, { "sampler", "coords", "lod" }, TAG_GLOBAL, true },
+	{ "textureLod", TYPE_VEC4, { TYPE_SAMPLERCUBE, TYPE_VEC3, TYPE_FLOAT, TYPE_VOID }, { "sampler", "coords", "lod" }, TAG_GLOBAL, false },
+	{ "textureLod", TYPE_VEC4, { TYPE_SAMPLERCUBEARRAY, TYPE_VEC4, TYPE_FLOAT, TYPE_VOID }, { "sampler", "coords", "lod" }, TAG_GLOBAL, false },
 
-	{ "texelFetch", TYPE_VEC4, { TYPE_SAMPLER2D, TYPE_IVEC2, TYPE_INT, TYPE_VOID }, TAG_GLOBAL, true },
-	{ "texelFetch", TYPE_IVEC4, { TYPE_ISAMPLER2D, TYPE_IVEC2, TYPE_INT, TYPE_VOID }, TAG_GLOBAL, true },
-	{ "texelFetch", TYPE_UVEC4, { TYPE_USAMPLER2D, TYPE_IVEC2, TYPE_INT, TYPE_VOID }, TAG_GLOBAL, true },
-	{ "texelFetch", TYPE_VEC4, { TYPE_SAMPLER2DARRAY, TYPE_IVEC3, TYPE_INT, TYPE_VOID }, TAG_GLOBAL, true },
-	{ "texelFetch", TYPE_IVEC4, { TYPE_ISAMPLER2DARRAY, TYPE_IVEC3, TYPE_INT, TYPE_VOID }, TAG_GLOBAL, true },
-	{ "texelFetch", TYPE_UVEC4, { TYPE_USAMPLER2DARRAY, TYPE_IVEC3, TYPE_INT, TYPE_VOID }, TAG_GLOBAL, true },
-	{ "texelFetch", TYPE_VEC4, { TYPE_SAMPLER3D, TYPE_IVEC3, TYPE_INT, TYPE_VOID }, TAG_GLOBAL, true },
-	{ "texelFetch", TYPE_IVEC4, { TYPE_ISAMPLER3D, TYPE_IVEC3, TYPE_INT, TYPE_VOID }, TAG_GLOBAL, true },
-	{ "texelFetch", TYPE_UVEC4, { TYPE_USAMPLER3D, TYPE_IVEC3, TYPE_INT, TYPE_VOID }, TAG_GLOBAL, true },
+	{ "texelFetch", TYPE_VEC4, { TYPE_SAMPLER2D, TYPE_IVEC2, TYPE_INT, TYPE_VOID }, { "sampler", "coords", "lod" }, TAG_GLOBAL, true },
+	{ "texelFetch", TYPE_IVEC4, { TYPE_ISAMPLER2D, TYPE_IVEC2, TYPE_INT, TYPE_VOID }, { "sampler", "coords", "lod" }, TAG_GLOBAL, true },
+	{ "texelFetch", TYPE_UVEC4, { TYPE_USAMPLER2D, TYPE_IVEC2, TYPE_INT, TYPE_VOID }, { "sampler", "coords", "lod" }, TAG_GLOBAL, true },
+	{ "texelFetch", TYPE_VEC4, { TYPE_SAMPLER2DARRAY, TYPE_IVEC3, TYPE_INT, TYPE_VOID }, { "sampler", "coords", "lod" }, TAG_GLOBAL, true },
+	{ "texelFetch", TYPE_IVEC4, { TYPE_ISAMPLER2DARRAY, TYPE_IVEC3, TYPE_INT, TYPE_VOID }, { "sampler", "coords", "lod" }, TAG_GLOBAL, true },
+	{ "texelFetch", TYPE_UVEC4, { TYPE_USAMPLER2DARRAY, TYPE_IVEC3, TYPE_INT, TYPE_VOID }, { "sampler", "coords", "lod" }, TAG_GLOBAL, true },
+	{ "texelFetch", TYPE_VEC4, { TYPE_SAMPLER3D, TYPE_IVEC3, TYPE_INT, TYPE_VOID }, { "sampler", "coords", "lod" }, TAG_GLOBAL, true },
+	{ "texelFetch", TYPE_IVEC4, { TYPE_ISAMPLER3D, TYPE_IVEC3, TYPE_INT, TYPE_VOID }, { "sampler", "coords", "lod" }, TAG_GLOBAL, true },
+	{ "texelFetch", TYPE_UVEC4, { TYPE_USAMPLER3D, TYPE_IVEC3, TYPE_INT, TYPE_VOID }, { "sampler", "coords", "lod" }, TAG_GLOBAL, true },
 
-	{ "textureProjLod", TYPE_VEC4, { TYPE_SAMPLER2D, TYPE_VEC3, TYPE_FLOAT, TYPE_VOID }, TAG_GLOBAL, true },
-	{ "textureProjLod", TYPE_VEC4, { TYPE_SAMPLER2D, TYPE_VEC4, TYPE_FLOAT, TYPE_VOID }, TAG_GLOBAL, true },
-	{ "textureProjLod", TYPE_IVEC4, { TYPE_ISAMPLER2D, TYPE_VEC3, TYPE_FLOAT, TYPE_VOID }, TAG_GLOBAL, true },
-	{ "textureProjLod", TYPE_IVEC4, { TYPE_ISAMPLER2D, TYPE_VEC4, TYPE_FLOAT, TYPE_VOID }, TAG_GLOBAL, true },
-	{ "textureProjLod", TYPE_UVEC4, { TYPE_USAMPLER2D, TYPE_VEC3, TYPE_FLOAT, TYPE_VOID }, TAG_GLOBAL, true },
-	{ "textureProjLod", TYPE_UVEC4, { TYPE_USAMPLER2D, TYPE_VEC4, TYPE_FLOAT, TYPE_VOID }, TAG_GLOBAL, true },
-	{ "textureProjLod", TYPE_VEC4, { TYPE_SAMPLER3D, TYPE_VEC4, TYPE_FLOAT, TYPE_VOID }, TAG_GLOBAL, true },
-	{ "textureProjLod", TYPE_IVEC4, { TYPE_ISAMPLER3D, TYPE_VEC4, TYPE_FLOAT, TYPE_VOID }, TAG_GLOBAL, true },
-	{ "textureProjLod", TYPE_UVEC4, { TYPE_USAMPLER3D, TYPE_VEC4, TYPE_FLOAT, TYPE_VOID }, TAG_GLOBAL, true },
+	{ "textureProjLod", TYPE_VEC4, { TYPE_SAMPLER2D, TYPE_VEC3, TYPE_FLOAT, TYPE_VOID }, { "sampler", "coords", "lod" }, TAG_GLOBAL, true },
+	{ "textureProjLod", TYPE_VEC4, { TYPE_SAMPLER2D, TYPE_VEC4, TYPE_FLOAT, TYPE_VOID }, { "sampler", "coords", "lod" }, TAG_GLOBAL, true },
+	{ "textureProjLod", TYPE_IVEC4, { TYPE_ISAMPLER2D, TYPE_VEC3, TYPE_FLOAT, TYPE_VOID }, { "sampler", "coords", "lod" }, TAG_GLOBAL, true },
+	{ "textureProjLod", TYPE_IVEC4, { TYPE_ISAMPLER2D, TYPE_VEC4, TYPE_FLOAT, TYPE_VOID }, { "sampler", "coords", "lod" }, TAG_GLOBAL, true },
+	{ "textureProjLod", TYPE_UVEC4, { TYPE_USAMPLER2D, TYPE_VEC3, TYPE_FLOAT, TYPE_VOID }, { "sampler", "coords", "lod" }, TAG_GLOBAL, true },
+	{ "textureProjLod", TYPE_UVEC4, { TYPE_USAMPLER2D, TYPE_VEC4, TYPE_FLOAT, TYPE_VOID }, { "sampler", "coords", "lod" }, TAG_GLOBAL, true },
+	{ "textureProjLod", TYPE_VEC4, { TYPE_SAMPLER3D, TYPE_VEC4, TYPE_FLOAT, TYPE_VOID }, { "sampler", "coords", "lod" }, TAG_GLOBAL, true },
+	{ "textureProjLod", TYPE_IVEC4, { TYPE_ISAMPLER3D, TYPE_VEC4, TYPE_FLOAT, TYPE_VOID }, { "sampler", "coords", "lod" }, TAG_GLOBAL, true },
+	{ "textureProjLod", TYPE_UVEC4, { TYPE_USAMPLER3D, TYPE_VEC4, TYPE_FLOAT, TYPE_VOID }, { "sampler", "coords", "lod" }, TAG_GLOBAL, true },
 
-	{ "textureGrad", TYPE_VEC4, { TYPE_SAMPLER2D, TYPE_VEC2, TYPE_VEC2, TYPE_VEC2, TYPE_VOID }, TAG_GLOBAL, true },
-	{ "textureGrad", TYPE_IVEC4, { TYPE_ISAMPLER2D, TYPE_VEC2, TYPE_VEC2, TYPE_VEC2, TYPE_VOID }, TAG_GLOBAL, true },
-	{ "textureGrad", TYPE_UVEC4, { TYPE_USAMPLER2D, TYPE_VEC2, TYPE_VEC2, TYPE_VEC2, TYPE_VOID }, TAG_GLOBAL, true },
-	{ "textureGrad", TYPE_VEC4, { TYPE_SAMPLER2DARRAY, TYPE_VEC3, TYPE_VEC2, TYPE_VEC2, TYPE_VOID }, TAG_GLOBAL, true },
-	{ "textureGrad", TYPE_IVEC4, { TYPE_ISAMPLER2DARRAY, TYPE_VEC3, TYPE_VEC2, TYPE_VEC2, TYPE_VOID }, TAG_GLOBAL, true },
-	{ "textureGrad", TYPE_UVEC4, { TYPE_USAMPLER2DARRAY, TYPE_VEC3, TYPE_VEC2, TYPE_VEC2, TYPE_VOID }, TAG_GLOBAL, true },
-	{ "textureGrad", TYPE_VEC4, { TYPE_SAMPLER3D, TYPE_VEC3, TYPE_VEC3, TYPE_VEC3, TYPE_VOID }, TAG_GLOBAL, true },
-	{ "textureGrad", TYPE_IVEC4, { TYPE_ISAMPLER3D, TYPE_VEC3, TYPE_VEC3, TYPE_VEC3, TYPE_VOID }, TAG_GLOBAL, true },
-	{ "textureGrad", TYPE_UVEC4, { TYPE_USAMPLER3D, TYPE_VEC3, TYPE_VEC3, TYPE_VEC3, TYPE_VOID }, TAG_GLOBAL, true },
-	{ "textureGrad", TYPE_VEC4, { TYPE_SAMPLERCUBE, TYPE_VEC3, TYPE_VEC3, TYPE_VEC3, TYPE_VOID }, TAG_GLOBAL, true },
-	{ "textureGrad", TYPE_VEC4, { TYPE_SAMPLERCUBEARRAY, TYPE_VEC4, TYPE_VEC3, TYPE_VEC3, TYPE_VOID }, TAG_GLOBAL, true },
+	{ "textureGrad", TYPE_VEC4, { TYPE_SAMPLER2D, TYPE_VEC2, TYPE_VEC2, TYPE_VEC2, TYPE_VOID }, { "sampler", "coords", "dPdx", "dPdy" }, TAG_GLOBAL, true },
+	{ "textureGrad", TYPE_IVEC4, { TYPE_ISAMPLER2D, TYPE_VEC2, TYPE_VEC2, TYPE_VEC2, TYPE_VOID }, { "sampler", "coords", "dPdx", "dPdy" }, TAG_GLOBAL, true },
+	{ "textureGrad", TYPE_UVEC4, { TYPE_USAMPLER2D, TYPE_VEC2, TYPE_VEC2, TYPE_VEC2, TYPE_VOID }, { "sampler", "coords", "dPdx", "dPdy" }, TAG_GLOBAL, true },
+	{ "textureGrad", TYPE_VEC4, { TYPE_SAMPLER2DARRAY, TYPE_VEC3, TYPE_VEC2, TYPE_VEC2, TYPE_VOID }, { "sampler", "coords", "dPdx", "dPdy" }, TAG_GLOBAL, true },
+	{ "textureGrad", TYPE_IVEC4, { TYPE_ISAMPLER2DARRAY, TYPE_VEC3, TYPE_VEC2, TYPE_VEC2, TYPE_VOID }, { "sampler", "coords", "dPdx", "dPdy" }, TAG_GLOBAL, true },
+	{ "textureGrad", TYPE_UVEC4, { TYPE_USAMPLER2DARRAY, TYPE_VEC3, TYPE_VEC2, TYPE_VEC2, TYPE_VOID }, { "sampler", "coords", "dPdx", "dPdy" }, TAG_GLOBAL, true },
+	{ "textureGrad", TYPE_VEC4, { TYPE_SAMPLER3D, TYPE_VEC3, TYPE_VEC3, TYPE_VEC3, TYPE_VOID }, { "sampler", "coords", "dPdx", "dPdy" }, TAG_GLOBAL, true },
+	{ "textureGrad", TYPE_IVEC4, { TYPE_ISAMPLER3D, TYPE_VEC3, TYPE_VEC3, TYPE_VEC3, TYPE_VOID }, { "sampler", "coords", "dPdx", "dPdy" }, TAG_GLOBAL, true },
+	{ "textureGrad", TYPE_UVEC4, { TYPE_USAMPLER3D, TYPE_VEC3, TYPE_VEC3, TYPE_VEC3, TYPE_VOID }, { "sampler", "coords", "dPdx", "dPdy" }, TAG_GLOBAL, true },
+	{ "textureGrad", TYPE_VEC4, { TYPE_SAMPLERCUBE, TYPE_VEC3, TYPE_VEC3, TYPE_VEC3, TYPE_VOID }, { "sampler", "coords", "dPdx", "dPdy" }, TAG_GLOBAL, true },
+	{ "textureGrad", TYPE_VEC4, { TYPE_SAMPLERCUBEARRAY, TYPE_VEC4, TYPE_VEC3, TYPE_VEC3, TYPE_VOID }, { "sampler", "coords", "dPdx", "dPdy" }, TAG_GLOBAL, true },
 
-	{ "dFdx", TYPE_FLOAT, { TYPE_FLOAT, TYPE_VOID }, TAG_GLOBAL, true },
-	{ "dFdx", TYPE_VEC2, { TYPE_VEC2, TYPE_VOID }, TAG_GLOBAL, true },
-	{ "dFdx", TYPE_VEC3, { TYPE_VEC3, TYPE_VOID }, TAG_GLOBAL, true },
-	{ "dFdx", TYPE_VEC4, { TYPE_VEC4, TYPE_VOID }, TAG_GLOBAL, true },
+	{ "dFdx", TYPE_FLOAT, { TYPE_FLOAT, TYPE_VOID }, { "p" }, TAG_GLOBAL, true },
+	{ "dFdx", TYPE_VEC2, { TYPE_VEC2, TYPE_VOID }, { "p" }, TAG_GLOBAL, true },
+	{ "dFdx", TYPE_VEC3, { TYPE_VEC3, TYPE_VOID }, { "p" }, TAG_GLOBAL, true },
+	{ "dFdx", TYPE_VEC4, { TYPE_VEC4, TYPE_VOID }, { "p" }, TAG_GLOBAL, true },
 
-	{ "dFdy", TYPE_FLOAT, { TYPE_FLOAT, TYPE_VOID }, TAG_GLOBAL, true },
-	{ "dFdy", TYPE_VEC2, { TYPE_VEC2, TYPE_VOID }, TAG_GLOBAL, true },
-	{ "dFdy", TYPE_VEC3, { TYPE_VEC3, TYPE_VOID }, TAG_GLOBAL, true },
-	{ "dFdy", TYPE_VEC4, { TYPE_VEC4, TYPE_VOID }, TAG_GLOBAL, true },
+	{ "dFdy", TYPE_FLOAT, { TYPE_FLOAT, TYPE_VOID }, { "p" }, TAG_GLOBAL, true },
+	{ "dFdy", TYPE_VEC2, { TYPE_VEC2, TYPE_VOID }, { "p" }, TAG_GLOBAL, true },
+	{ "dFdy", TYPE_VEC3, { TYPE_VEC3, TYPE_VOID }, { "p" }, TAG_GLOBAL, true },
+	{ "dFdy", TYPE_VEC4, { TYPE_VEC4, TYPE_VOID }, { "p" }, TAG_GLOBAL, true },
 
-	{ "fwidth", TYPE_FLOAT, { TYPE_FLOAT, TYPE_VOID }, TAG_GLOBAL, true },
-	{ "fwidth", TYPE_VEC2, { TYPE_VEC2, TYPE_VOID }, TAG_GLOBAL, true },
-	{ "fwidth", TYPE_VEC3, { TYPE_VEC3, TYPE_VOID }, TAG_GLOBAL, true },
-	{ "fwidth", TYPE_VEC4, { TYPE_VEC4, TYPE_VOID }, TAG_GLOBAL, true },
+	{ "fwidth", TYPE_FLOAT, { TYPE_FLOAT, TYPE_VOID }, { "p" }, TAG_GLOBAL, true },
+	{ "fwidth", TYPE_VEC2, { TYPE_VEC2, TYPE_VOID }, { "p" }, TAG_GLOBAL, true },
+	{ "fwidth", TYPE_VEC3, { TYPE_VEC3, TYPE_VOID }, { "p" }, TAG_GLOBAL, true },
+	{ "fwidth", TYPE_VEC4, { TYPE_VEC4, TYPE_VOID }, { "p" }, TAG_GLOBAL, true },
 
 	//sub-functions
 
 	//array
-	{ "length", TYPE_INT, { TYPE_VOID }, TAG_ARRAY, true },
+	{ "length", TYPE_INT, { TYPE_VOID }, { "" }, TAG_ARRAY, true },
 
 	// modern functions
 
-	{ "fma", TYPE_FLOAT, { TYPE_FLOAT, TYPE_FLOAT, TYPE_FLOAT, TYPE_VOID }, TAG_GLOBAL, false },
-	{ "fma", TYPE_VEC2, { TYPE_VEC2, TYPE_VEC2, TYPE_VEC2, TYPE_VOID }, TAG_GLOBAL, false },
-	{ "fma", TYPE_VEC3, { TYPE_VEC3, TYPE_VEC3, TYPE_VEC3, TYPE_VOID }, TAG_GLOBAL, false },
-	{ "fma", TYPE_VEC4, { TYPE_VEC4, TYPE_VEC4, TYPE_VEC4, TYPE_VOID }, TAG_GLOBAL, false },
+	{ "fma", TYPE_FLOAT, { TYPE_FLOAT, TYPE_FLOAT, TYPE_FLOAT, TYPE_VOID }, { "a", "b", "c" }, TAG_GLOBAL, false },
+	{ "fma", TYPE_VEC2, { TYPE_VEC2, TYPE_VEC2, TYPE_VEC2, TYPE_VOID }, { "a", "b", "c" }, TAG_GLOBAL, false },
+	{ "fma", TYPE_VEC3, { TYPE_VEC3, TYPE_VEC3, TYPE_VEC3, TYPE_VOID }, { "a", "b", "c" }, TAG_GLOBAL, false },
+	{ "fma", TYPE_VEC4, { TYPE_VEC4, TYPE_VEC4, TYPE_VEC4, TYPE_VOID }, { "a", "b", "c" }, TAG_GLOBAL, false },
 
-	{ nullptr, TYPE_VOID, { TYPE_VOID }, TAG_GLOBAL, false }
+	{ nullptr, TYPE_VOID, { TYPE_VOID }, { "" }, TAG_GLOBAL, false }
 };
 
 const ShaderLanguage::BuiltinFuncOutArgs ShaderLanguage::builtin_func_out_args[] = {
@@ -2380,6 +2384,10 @@ bool ShaderLanguage::_validate_function_call(BlockNode *p_block, const FunctionI
 				failed_builtin = true;
 				bool fail = false;
 				for (int i = 0; i < argcount; i++) {
+					if (p_func->arguments[i + 1]->type == Node::TYPE_ARRAY && !static_cast<const ArrayNode *>(p_func->arguments[i + 1])->is_indexed()) {
+						fail = true;
+						break;
+					}
 					if (get_scalar_type(args[i]) == args[i] && p_func->arguments[i + 1]->type == Node::TYPE_CONSTANT && convert_constant(static_cast<ConstantNode *>(p_func->arguments[i + 1]), builtin_func_defs[idx].args[i])) {
 						//all good, but needs implicit conversion later
 					} else if (args[i] != builtin_func_defs[idx].args[i]) {
@@ -2434,6 +2442,10 @@ bool ShaderLanguage::_validate_function_call(BlockNode *p_block, const FunctionI
 										if (shader->uniforms.has(varname)) {
 											fail = true;
 										} else {
+											if (shader->varyings.has(varname)) {
+												_set_error(vformat("Varyings cannot be passed for '%s' parameter!", "out"));
+												return false;
+											}
 											if (p_function_info.built_ins.has(varname)) {
 												BuiltInInfo info = p_function_info.built_ins[varname];
 												if (info.constant) {
@@ -2551,6 +2563,11 @@ bool ShaderLanguage::_validate_function_call(BlockNode *p_block, const FunctionI
 				arg_name = args2[i];
 			} else {
 				arg_name = get_datatype_name(args[i]);
+			}
+			if (args3[i] > 0) {
+				arg_name += "[";
+				arg_name += itos(args3[i]);
+				arg_name += "]";
 			}
 			err += arg_name;
 		}
@@ -2812,6 +2829,20 @@ bool ShaderLanguage::is_token_operator(TokenType p_type) {
 			p_type == TK_COLON);
 }
 
+bool ShaderLanguage::is_token_operator_assign(TokenType p_type) {
+	return (p_type == TK_OP_ASSIGN ||
+			p_type == TK_OP_ASSIGN_ADD ||
+			p_type == TK_OP_ASSIGN_SUB ||
+			p_type == TK_OP_ASSIGN_MUL ||
+			p_type == TK_OP_ASSIGN_DIV ||
+			p_type == TK_OP_ASSIGN_MOD ||
+			p_type == TK_OP_ASSIGN_SHIFT_LEFT ||
+			p_type == TK_OP_ASSIGN_SHIFT_RIGHT ||
+			p_type == TK_OP_ASSIGN_BIT_AND ||
+			p_type == TK_OP_ASSIGN_BIT_OR ||
+			p_type == TK_OP_ASSIGN_BIT_XOR);
+}
+
 bool ShaderLanguage::convert_constant(ConstantNode *p_constant, DataType p_to_type, ConstantNode::Value *p_value) {
 	if (p_constant->datatype == p_to_type) {
 		if (p_value) {
@@ -2855,6 +2886,27 @@ bool ShaderLanguage::is_scalar_type(DataType p_type) {
 	return p_type == TYPE_BOOL || p_type == TYPE_INT || p_type == TYPE_UINT || p_type == TYPE_FLOAT;
 }
 
+bool ShaderLanguage::is_float_type(DataType p_type) {
+	switch (p_type) {
+		case TYPE_FLOAT:
+		case TYPE_VEC2:
+		case TYPE_VEC3:
+		case TYPE_VEC4:
+		case TYPE_MAT2:
+		case TYPE_MAT3:
+		case TYPE_MAT4:
+		case TYPE_SAMPLER2D:
+		case TYPE_SAMPLER2DARRAY:
+		case TYPE_SAMPLER3D:
+		case TYPE_SAMPLERCUBE:
+		case TYPE_SAMPLERCUBEARRAY: {
+			return true;
+		}
+		default: {
+			return false;
+		}
+	}
+}
 bool ShaderLanguage::is_sampler_type(DataType p_type) {
 	return p_type == TYPE_SAMPLER2D ||
 		   p_type == TYPE_ISAMPLER2D ||
@@ -3306,8 +3358,8 @@ bool ShaderLanguage::_is_operator_assign(Operator p_op) const {
 }
 
 bool ShaderLanguage::_validate_varying_assign(ShaderNode::Varying &p_varying, String *r_message) {
-	if (current_function == String("light")) {
-		*r_message = RTR("Varying may not be assigned in the 'light' function.");
+	if (current_function != String("vertex") && current_function != String("fragment")) {
+		*r_message = vformat(RTR("Varying may not be assigned in the '%s' function."), current_function);
 		return false;
 	}
 	switch (p_varying.stage) {
@@ -3318,12 +3370,14 @@ bool ShaderLanguage::_validate_varying_assign(ShaderNode::Varying &p_varying, St
 				p_varying.stage = ShaderNode::Varying::STAGE_FRAGMENT;
 			}
 			break;
+		case ShaderNode::Varying::STAGE_VERTEX_TO_FRAGMENT_LIGHT:
 		case ShaderNode::Varying::STAGE_VERTEX:
 			if (current_function == varying_function_names.fragment) {
 				*r_message = RTR("Varyings which assigned in 'vertex' function may not be reassigned in 'fragment' or 'light'.");
 				return false;
 			}
 			break;
+		case ShaderNode::Varying::STAGE_FRAGMENT_TO_LIGHT:
 		case ShaderNode::Varying::STAGE_FRAGMENT:
 			if (current_function == varying_function_names.vertex) {
 				*r_message = RTR("Varyings which assigned in 'fragment' function may not be reassigned in 'vertex' or 'light'.");
@@ -3339,13 +3393,14 @@ bool ShaderLanguage::_validate_varying_assign(ShaderNode::Varying &p_varying, St
 bool ShaderLanguage::_validate_varying_using(ShaderNode::Varying &p_varying, String *r_message) {
 	switch (p_varying.stage) {
 		case ShaderNode::Varying::STAGE_UNKNOWN:
-			*r_message = RTR("Varying must be assigned before using!");
-			return false;
+			VaryingUsage usage;
+			usage.var = &p_varying;
+			usage.line = tk_line;
+			unknown_varying_usages.push_back(usage);
+			break;
 		case ShaderNode::Varying::STAGE_VERTEX:
-			if (current_function == varying_function_names.fragment) {
-				p_varying.stage = ShaderNode::Varying::STAGE_VERTEX_TO_FRAGMENT;
-			} else if (current_function == varying_function_names.light) {
-				p_varying.stage = ShaderNode::Varying::STAGE_VERTEX_TO_LIGHT;
+			if (current_function == varying_function_names.fragment || current_function == varying_function_names.light) {
+				p_varying.stage = ShaderNode::Varying::STAGE_VERTEX_TO_FRAGMENT_LIGHT;
 			}
 			break;
 		case ShaderNode::Varying::STAGE_FRAGMENT:
@@ -3353,21 +3408,22 @@ bool ShaderLanguage::_validate_varying_using(ShaderNode::Varying &p_varying, Str
 				p_varying.stage = ShaderNode::Varying::STAGE_FRAGMENT_TO_LIGHT;
 			}
 			break;
-		case ShaderNode::Varying::STAGE_VERTEX_TO_FRAGMENT:
-			if (current_function == varying_function_names.light) {
-				*r_message = RTR("Varying must only be used in two different stages, which can be 'vertex' 'fragment' and 'light'");
-				return false;
-			}
-			break;
-		case ShaderNode::Varying::STAGE_VERTEX_TO_LIGHT:
-			if (current_function == varying_function_names.fragment) {
-				*r_message = RTR("Varying must only be used in two different stages, which can be 'vertex' 'fragment' and 'light'");
-				return false;
-			}
-			break;
 		default:
 			break;
 	}
+	return true;
+}
+
+bool ShaderLanguage::_check_varying_usages(int *r_error_line, String *r_error_message) const {
+	for (const List<ShaderLanguage::VaryingUsage>::Element *E = unknown_varying_usages.front(); E; E = E->next()) {
+		ShaderNode::Varying::Stage stage = E->get().var->stage;
+		if (stage != ShaderNode::Varying::STAGE_UNKNOWN && stage != ShaderNode::Varying::STAGE_VERTEX && stage != ShaderNode::Varying::STAGE_VERTEX_TO_FRAGMENT_LIGHT) {
+			*r_error_line = E->get().line;
+			*r_error_message = RTR("Fragment-stage varying could not been accessed in custom function!");
+			return false;
+		}
+	}
+
 	return true;
 }
 
@@ -4114,6 +4170,10 @@ ShaderLanguage::Node *ShaderLanguage::_parse_expression(BlockNode *p_block, cons
 												} else if (shader->uniforms.has(varname)) {
 													error = true;
 												} else {
+													if (shader->varyings.has(varname)) {
+														_set_error(vformat("Varyings cannot be passed for '%s' parameter!", _get_qualifier_str(call_function->arguments[i].qualifier)));
+														return nullptr;
+													}
 													if (p_function_info.built_ins.has(varname)) {
 														BuiltInInfo info = p_function_info.built_ins[varname];
 														if (info.constant) {
@@ -4198,6 +4258,7 @@ ShaderLanguage::Node *ShaderLanguage::_parse_expression(BlockNode *p_block, cons
 				IdentifierType ident_type;
 				int array_size = 0;
 				StringName struct_name;
+				bool is_local = false;
 
 				if (p_block && p_block->block_tag != SubClassTag::TAG_GLOBAL) {
 					int idx = 0;
@@ -4222,9 +4283,17 @@ ShaderLanguage::Node *ShaderLanguage::_parse_expression(BlockNode *p_block, cons
 					if (ident_type == IDENTIFIER_VARYING) {
 						TkPos prev_pos = _get_tkpos();
 						Token next_token = _get_token();
+
+						// An array of varyings.
+						if (next_token.type == TK_BRACKET_OPEN) {
+							_get_token(); // Pass constant.
+							_get_token(); // Pass TK_BRACKET_CLOSE.
+							next_token = _get_token();
+						}
 						_set_tkpos(prev_pos);
+
 						String error;
-						if (next_token.type == TK_OP_ASSIGN) {
+						if (is_token_operator_assign(next_token.type)) {
 							if (!_validate_varying_assign(shader->varyings[identifier], &error)) {
 								_set_error(error);
 								return nullptr;
@@ -4246,6 +4315,8 @@ ShaderLanguage::Node *ShaderLanguage::_parse_expression(BlockNode *p_block, cons
 					} else {
 						last_type = ident_type;
 					}
+
+					is_local = ident_type == IDENTIFIER_LOCAL_VAR || ident_type == IDENTIFIER_FUNCTION_ARGUMENT;
 				}
 
 				Node *index_expression = nullptr;
@@ -4320,6 +4391,7 @@ ShaderLanguage::Node *ShaderLanguage::_parse_expression(BlockNode *p_block, cons
 					arrname->assign_expression = assign_expression;
 					arrname->is_const = is_const;
 					arrname->array_size = array_size;
+					arrname->is_local = is_local;
 					expr = arrname;
 				} else {
 					VariableNode *varname = alloc_node<VariableNode>();
@@ -4327,6 +4399,7 @@ ShaderLanguage::Node *ShaderLanguage::_parse_expression(BlockNode *p_block, cons
 					varname->datatype_cache = data_type;
 					varname->is_const = is_const;
 					varname->struct_name = struct_name;
+					varname->is_local = is_local;
 					expr = varname;
 				}
 #ifdef DEBUG_ENABLED
@@ -4435,12 +4508,12 @@ ShaderLanguage::Node *ShaderLanguage::_parse_expression(BlockNode *p_block, cons
 						String member_name = String(ident.ptr());
 						if (shader->structs.has(st)) {
 							StructNode *n = shader->structs[st].shader_struct;
-							for (List<MemberNode *>::Element *E = n->members.front(); E; E = E->next()) {
-								if (String(E->get()->name) == member_name) {
-									member_type = E->get()->datatype;
-									array_size = E->get()->array_size;
+							for (const MemberNode *E : n->members) {
+								if (String(E->name) == member_name) {
+									member_type = E->datatype;
+									array_size = E->array_size;
 									if (member_type == TYPE_STRUCT) {
-										member_struct_name = E->get()->struct_name;
+										member_struct_name = E->struct_name;
 									}
 									ok = true;
 									break;
@@ -4765,10 +4838,12 @@ ShaderLanguage::Node *ShaderLanguage::_parse_expression(BlockNode *p_block, cons
 				String member_struct_name;
 
 				if (expr->get_array_size() > 0) {
-					uint32_t index_constant = static_cast<ConstantNode *>(index)->values[0].uint;
-					if (index_constant >= (uint32_t)expr->get_array_size()) {
-						_set_error(vformat("Index [%s] out of range [%s..%s]", index_constant, 0, expr->get_array_size() - 1));
-						return nullptr;
+					if (index->type == Node::TYPE_CONSTANT) {
+						uint32_t index_constant = static_cast<ConstantNode *>(index)->values[0].uint;
+						if (index_constant >= (uint32_t)expr->get_array_size()) {
+							_set_error(vformat("Index [%s] out of range [%s..%s]", index_constant, 0, expr->get_array_size() - 1));
+							return nullptr;
+						}
 					}
 					member_type = expr->get_datatype();
 					if (member_type == TYPE_STRUCT) {
@@ -5177,7 +5252,9 @@ ShaderLanguage::Node *ShaderLanguage::_parse_expression(BlockNode *p_block, cons
 			}
 
 #if DEBUG_ENABLED
-			if (check_warnings && HAS_WARNING(ShaderWarning::FLOAT_COMPARISON_FLAG) && (op == OP_EQUAL || op == OP_NOT_EQUAL) && expression[i - 1].node->get_datatype() == TYPE_FLOAT && expression[i + 1].node->get_datatype() == TYPE_FLOAT) {
+			if (check_warnings && HAS_WARNING(ShaderWarning::FLOAT_COMPARISON_FLAG) && (op == OP_EQUAL || op == OP_NOT_EQUAL) &&
+					(!expression[i - 1].is_op && !expression[i + 1].is_op) &&
+					(expression[i - 1].node->get_datatype() == TYPE_FLOAT && expression[i + 1].node->get_datatype() == TYPE_FLOAT)) {
 				_add_line_warning(ShaderWarning::FLOAT_COMPARISON);
 			}
 #endif // DEBUG_ENABLED
@@ -6583,6 +6660,7 @@ Error ShaderLanguage::_validate_datatype(DataType p_type) {
 
 Error ShaderLanguage::_parse_shader(const Map<StringName, FunctionInfo> &p_functions, const Vector<StringName> &p_render_modes, const Set<String> &p_shader_types) {
 	Token tk = _get_token();
+	TkPos prev_pos;
 
 	if (tk.type != TK_SHADER_TYPE) {
 		_set_error("Expected 'shader_type' at the beginning of shader. Valid types are: " + _get_shader_type_list(p_shader_types));
@@ -6604,11 +6682,13 @@ Error ShaderLanguage::_parse_shader(const Map<StringName, FunctionInfo> &p_funct
 		_set_error("Invalid shader type. Valid types are: " + _get_shader_type_list(p_shader_types));
 		return ERR_PARSE_ERROR;
 	}
-
+	prev_pos = _get_tkpos();
 	tk = _get_token();
 
 	if (tk.type != TK_SEMICOLON) {
+		_set_tkpos(prev_pos);
 		_set_error("Expected ';' after 'shader_type <type>'.");
+		return ERR_PARSE_ERROR;
 	}
 
 	tk = _get_token();
@@ -6827,6 +6907,7 @@ Error ShaderLanguage::_parse_shader(const Map<StringName, FunctionInfo> &p_funct
 				DataInterpolation interpolation = INTERPOLATION_SMOOTH;
 				DataType type;
 				StringName name;
+				int array_size = 0;
 
 				tk = _get_token();
 				if (is_token_interpolation(tk.type)) {
@@ -6857,12 +6938,36 @@ Error ShaderLanguage::_parse_shader(const Map<StringName, FunctionInfo> &p_funct
 				}
 
 				tk = _get_token();
+
+				if (tk.type == TK_BRACKET_OPEN) {
+					if (uniform) {
+						_set_error(vformat("Uniform arrays are not yet implemented!"));
+						return ERR_PARSE_ERROR;
+					}
+					tk = _get_token();
+
+					if (tk.type == TK_INT_CONSTANT && tk.constant > 0) {
+						array_size = (int)tk.constant;
+
+						tk = _get_token();
+						if (tk.type == TK_BRACKET_CLOSE) {
+							tk = _get_token();
+						} else {
+							_set_error("Expected ']'");
+							return ERR_PARSE_ERROR;
+						}
+					} else {
+						_set_error("Expected integer constant > 0");
+						return ERR_PARSE_ERROR;
+					}
+				}
+
 				if (tk.type != TK_IDENTIFIER) {
 					_set_error("Expected identifier!");
 					return ERR_PARSE_ERROR;
 				}
 
-				TkPos name_pos = _get_tkpos();
+				prev_pos = _get_tkpos();
 				name = tk.text;
 
 				if (_find_identifier(nullptr, false, FunctionInfo(), name)) {
@@ -7155,7 +7260,8 @@ Error ShaderLanguage::_parse_shader(const Map<StringName, FunctionInfo> &p_funct
 					varying.type = type;
 					varying.precision = precision;
 					varying.interpolation = interpolation;
-					varying.tkpos = name_pos;
+					varying.tkpos = prev_pos;
+					varying.array_size = array_size;
 
 					tk = _get_token();
 					if (tk.type != TK_SEMICOLON && tk.type != TK_BRACKET_OPEN) {
@@ -7164,6 +7270,10 @@ Error ShaderLanguage::_parse_shader(const Map<StringName, FunctionInfo> &p_funct
 					}
 
 					if (tk.type == TK_BRACKET_OPEN) {
+						if (array_size > 0) {
+							_set_error("Array size is already defined!");
+							return ERR_PARSE_ERROR;
+						}
 						tk = _get_token();
 						if (tk.type == TK_INT_CONSTANT && tk.constant > 0) {
 							varying.array_size = (int)tk.constant;
@@ -7239,7 +7349,7 @@ Error ShaderLanguage::_parse_shader(const Map<StringName, FunctionInfo> &p_funct
 				} else {
 					type = get_token_datatype(tk.type);
 				}
-				TkPos prev_pos = _get_tkpos();
+				prev_pos = _get_tkpos();
 				tk = _get_token();
 
 				if (tk.type == TK_BRACKET_OPEN) {
@@ -7382,13 +7492,13 @@ Error ShaderLanguage::_parse_shader(const Map<StringName, FunctionInfo> &p_funct
 
 									tk = _get_token();
 									if (tk.type == TK_BRACKET_OPEN) {
-										TkPos pos2 = _get_tkpos();
+										prev_pos = _get_tkpos();
 										tk = _get_token();
 										if (tk.type == TK_BRACKET_CLOSE) {
 											array_size2 = constant.array_size;
 											tk = _get_token();
 										} else {
-											_set_tkpos(pos2);
+											_set_tkpos(prev_pos);
 
 											Node *n = _parse_and_reduce_expression(nullptr, FunctionInfo());
 											if (!n || n->type != Node::TYPE_CONSTANT || n->get_datatype() != TYPE_INT) {
@@ -7863,12 +7973,12 @@ Error ShaderLanguage::_parse_shader(const Map<StringName, FunctionInfo> &p_funct
 		tk = _get_token();
 	}
 
-	for (Map<StringName, ShaderNode::Varying>::Element *E = shader->varyings.front(); E; E = E->next()) {
-		if (E->get().stage == ShaderNode::Varying::STAGE_VERTEX || E->get().stage == ShaderNode::Varying::STAGE_FRAGMENT) {
-			_set_tkpos(E->get().tkpos);
-			_set_error(RTR("Varying must only be used in two different stages, which can be 'vertex' 'fragment' and 'light'"));
-			return ERR_PARSE_ERROR;
-		}
+	int error_line;
+	String error_message;
+	if (!_check_varying_usages(&error_line, &error_message)) {
+		_set_tkpos({ 0, error_line });
+		_set_error(error_message);
+		return ERR_PARSE_ERROR;
 	}
 
 	return OK;
@@ -8400,6 +8510,12 @@ Error ShaderLanguage::complete(const String &p_code, const Map<StringName, Funct
 						}
 
 						calltip += get_datatype_name(builtin_func_defs[idx].args[i]);
+
+						String arg_name = (String)builtin_func_defs[idx].args_names[i];
+						if (!arg_name.is_empty()) {
+							calltip += " ";
+							calltip += arg_name;
+						}
 
 						if (i == completion_argument) {
 							calltip += char32_t(0xFFFF);

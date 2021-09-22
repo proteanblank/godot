@@ -51,7 +51,9 @@ GDScriptParser *GDScriptParserRef::get_parser() const {
 Error GDScriptParserRef::raise_status(Status p_new_status) {
 	ERR_FAIL_COND_V(parser == nullptr, ERR_INVALID_DATA);
 
-	Error result = OK;
+	if (result != OK) {
+		return result;
+	}
 
 	while (p_new_status > status) {
 		switch (status) {
@@ -86,14 +88,6 @@ Error GDScriptParserRef::raise_status(Status p_new_status) {
 			}
 		}
 		if (result != OK) {
-			if (parser != nullptr) {
-				memdelete(parser);
-				parser = nullptr;
-			}
-			if (analyzer != nullptr) {
-				memdelete(analyzer);
-				analyzer = nullptr;
-			}
 			return result;
 		}
 	}
@@ -200,7 +194,9 @@ Ref<GDScript> GDScriptCache::get_full_script(const String &p_path, Error &r_erro
 	if (singleton->full_gdscript_cache.has(p_path)) {
 		return singleton->full_gdscript_cache[p_path];
 	}
+
 	Ref<GDScript> script = get_shallow_script(p_path);
+	ERR_FAIL_COND_V(script.is_null(), Ref<GDScript>());
 
 	r_error = script->load_source_code(p_path);
 

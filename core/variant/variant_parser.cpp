@@ -506,9 +506,9 @@ Error VariantParser::parse_value(Token &token, Variant &value, Stream *p_stream,
 		} else if (id == "null" || id == "nil") {
 			value = Variant();
 		} else if (id == "inf") {
-			value = Math_INF;
+			value = INFINITY;
 		} else if (id == "nan") {
-			value = Math_NAN;
+			value = NAN;
 		} else if (id == "Vector2") {
 			Vector<real_t> args;
 			Error err = _parse_construct<real_t>(p_stream, args, line, r_err_str);
@@ -1423,7 +1423,7 @@ Error VariantWriter::write(const Variant &p_variant, StoreStringFunc p_store_str
 			p_store_string_func(p_store_string_ud, itos(p_variant.operator int64_t()));
 		} break;
 		case Variant::FLOAT: {
-			String s = rtosfix(p_variant.operator real_t());
+			String s = rtosfix(p_variant.operator double());
 			if (s != "inf" && s != "nan") {
 				if (s.find(".") == -1 && s.find("e") == -1) {
 					s += ".0";
@@ -1586,8 +1586,8 @@ Error VariantWriter::write(const Variant &p_variant, StoreStringFunc p_store_str
 			List<PropertyInfo> props;
 			obj->get_property_list(&props);
 			bool first = true;
-			for (List<PropertyInfo>::Element *E = props.front(); E; E = E->next()) {
-				if (E->get().usage & PROPERTY_USAGE_STORAGE || E->get().usage & PROPERTY_USAGE_SCRIPT_VARIABLE) {
+			for (const PropertyInfo &E : props) {
+				if (E.usage & PROPERTY_USAGE_STORAGE || E.usage & PROPERTY_USAGE_SCRIPT_VARIABLE) {
 					//must be serialized
 
 					if (first) {
@@ -1596,8 +1596,8 @@ Error VariantWriter::write(const Variant &p_variant, StoreStringFunc p_store_str
 						p_store_string_func(p_store_string_ud, ",");
 					}
 
-					p_store_string_func(p_store_string_ud, "\"" + E->get().name + "\":");
-					write(obj->get(E->get().name), p_store_string_func, p_store_string_ud, p_encode_res_func, p_encode_res_ud);
+					p_store_string_func(p_store_string_ud, "\"" + E.name + "\":");
+					write(obj->get(E.name), p_store_string_func, p_store_string_ud, p_encode_res_func, p_encode_res_ud);
 				}
 			}
 
@@ -1615,7 +1615,7 @@ Error VariantWriter::write(const Variant &p_variant, StoreStringFunc p_store_str
 			p_store_string_func(p_store_string_ud, "{\n");
 			for (List<Variant>::Element *E = keys.front(); E; E = E->next()) {
 				/*
-				if (!_check_type(dict[E->get()]))
+				if (!_check_type(dict[E]))
 					continue;
 				*/
 				write(E->get(), p_store_string_func, p_store_string_ud, p_encode_res_func, p_encode_res_ud);

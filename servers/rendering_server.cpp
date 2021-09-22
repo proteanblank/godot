@@ -53,15 +53,15 @@ Array RenderingServer::_texture_debug_usage_bind() {
 	List<TextureInfo> list;
 	texture_debug_usage(&list);
 	Array arr;
-	for (const List<TextureInfo>::Element *E = list.front(); E; E = E->next()) {
+	for (const TextureInfo &E : list) {
 		Dictionary dict;
-		dict["texture"] = E->get().texture;
-		dict["width"] = E->get().width;
-		dict["height"] = E->get().height;
-		dict["depth"] = E->get().depth;
-		dict["format"] = E->get().format;
-		dict["bytes"] = E->get().bytes;
-		dict["path"] = E->get().path;
+		dict["texture"] = E.texture;
+		dict["width"] = E.width;
+		dict["height"] = E.height;
+		dict["depth"] = E.depth;
+		dict["format"] = E.format;
+		dict["bytes"] = E.bytes;
+		dict["path"] = E.path;
 		arr.push_back(dict);
 	}
 	return arr;
@@ -242,7 +242,7 @@ RID RenderingServer::_make_test_cube() {
 	return test_cube;
 }
 
-RID RenderingServer::make_sphere_mesh(int p_lats, int p_lons, float p_radius) {
+RID RenderingServer::make_sphere_mesh(int p_lats, int p_lons, real_t p_radius) {
 	Vector<Vector3> vertices;
 	Vector<Vector3> normals;
 	const double lat_step = Math_TAU / p_lats;
@@ -350,7 +350,7 @@ Error RenderingServer::_surface_set_data(Array p_arrays, uint32_t p_format, uint
 
 					{
 						for (int i = 0; i < p_vertex_array_len; i++) {
-							float vector[2] = { src[i].x, src[i].y };
+							float vector[2] = { (float)src[i].x, (float)src[i].y };
 
 							memcpy(&vw[p_offsets[ai] + i * p_vertex_stride], vector, sizeof(float) * 2);
 
@@ -375,7 +375,7 @@ Error RenderingServer::_surface_set_data(Array p_arrays, uint32_t p_format, uint
 
 					{
 						for (int i = 0; i < p_vertex_array_len; i++) {
-							float vector[3] = { src[i].x, src[i].y, src[i].z };
+							float vector[3] = { (float)src[i].x, (float)src[i].y, (float)src[i].z };
 
 							memcpy(&vw[p_offsets[ai] + i * p_vertex_stride], vector, sizeof(float) * 3);
 
@@ -412,26 +412,40 @@ Error RenderingServer::_surface_set_data(Array p_arrays, uint32_t p_format, uint
 			} break;
 
 			case RS::ARRAY_TANGENT: {
-				ERR_FAIL_COND_V(p_arrays[ai].get_type() != Variant::PACKED_FLOAT32_ARRAY, ERR_INVALID_PARAMETER);
+				Variant::Type type = p_arrays[ai].get_type();
+				ERR_FAIL_COND_V(type != Variant::PACKED_FLOAT32_ARRAY && type != Variant::PACKED_FLOAT64_ARRAY, ERR_INVALID_PARAMETER);
+				if (type == Variant::PACKED_FLOAT32_ARRAY) {
+					Vector<float> array = p_arrays[ai];
+					ERR_FAIL_COND_V(array.size() != p_vertex_array_len * 4, ERR_INVALID_PARAMETER);
+					const float *src = array.ptr();
 
-				Vector<real_t> array = p_arrays[ai];
+					for (int i = 0; i < p_vertex_array_len; i++) {
+						uint32_t value = 0;
+						value |= CLAMP(int((src[i * 4 + 0] * 0.5 + 0.5) * 1023.0), 0, 1023);
+						value |= CLAMP(int((src[i * 4 + 1] * 0.5 + 0.5) * 1023.0), 0, 1023) << 10;
+						value |= CLAMP(int((src[i * 4 + 2] * 0.5 + 0.5) * 1023.0), 0, 1023) << 20;
+						if (src[i * 4 + 3] > 0) {
+							value |= 3 << 30;
+						}
 
-				ERR_FAIL_COND_V(array.size() != p_vertex_array_len * 4, ERR_INVALID_PARAMETER);
-
-				const real_t *src = array.ptr();
-
-				for (int i = 0; i < p_vertex_array_len; i++) {
-					uint32_t value = 0;
-					value |= CLAMP(int((src[i * 4 + 0] * 0.5 + 0.5) * 1023.0), 0, 1023);
-					value |= CLAMP(int((src[i * 4 + 1] * 0.5 + 0.5) * 1023.0), 0, 1023) << 10;
-					value |= CLAMP(int((src[i * 4 + 2] * 0.5 + 0.5) * 1023.0), 0, 1023) << 20;
-					if (src[i * 4 + 3] > 0) {
-						value |= 3 << 30;
+						memcpy(&vw[p_offsets[ai] + i * p_vertex_stride], &value, 4);
 					}
+				} else { // if (type == Variant::PACKED_FLOAT64_ARRAY)
+					Vector<double> array = p_arrays[ai];
+					ERR_FAIL_COND_V(array.size() != p_vertex_array_len * 4, ERR_INVALID_PARAMETER);
+					const double *src = array.ptr();
 
-					memcpy(&vw[p_offsets[ai] + i * p_vertex_stride], &value, 4);
+					for (int i = 0; i < p_vertex_array_len; i++) {
+						uint32_t value = 0;
+						value |= CLAMP(int((src[i * 4 + 0] * 0.5 + 0.5) * 1023.0), 0, 1023);
+						value |= CLAMP(int((src[i * 4 + 1] * 0.5 + 0.5) * 1023.0), 0, 1023) << 10;
+						value |= CLAMP(int((src[i * 4 + 2] * 0.5 + 0.5) * 1023.0), 0, 1023) << 20;
+						if (src[i * 4 + 3] > 0) {
+							value |= 3 << 30;
+						}
+						memcpy(&vw[p_offsets[ai] + i * p_vertex_stride], &value, 4);
+					}
 				}
-
 			} break;
 			case RS::ARRAY_COLOR: {
 				ERR_FAIL_COND_V(p_arrays[ai].get_type() != Variant::PACKED_COLOR_ARRAY, ERR_INVALID_PARAMETER);
@@ -461,7 +475,7 @@ Error RenderingServer::_surface_set_data(Array p_arrays, uint32_t p_format, uint
 				const Vector2 *src = array.ptr();
 
 				for (int i = 0; i < p_vertex_array_len; i++) {
-					float uv[2] = { src[i].x, src[i].y };
+					float uv[2] = { (float)src[i].x, (float)src[i].y };
 
 					memcpy(&aw[p_offsets[ai] + i * p_attrib_stride], uv, 2 * 4);
 				}
@@ -478,7 +492,7 @@ Error RenderingServer::_surface_set_data(Array p_arrays, uint32_t p_format, uint
 				const Vector2 *src = array.ptr();
 
 				for (int i = 0; i < p_vertex_array_len; i++) {
-					float uv[2] = { src[i].x, src[i].y };
+					float uv[2] = { (float)src[i].x, (float)src[i].y };
 					memcpy(&aw[p_offsets[ai] + i * p_attrib_stride], uv, 2 * 4);
 				}
 			} break;
@@ -486,7 +500,7 @@ Error RenderingServer::_surface_set_data(Array p_arrays, uint32_t p_format, uint
 			case RS::ARRAY_CUSTOM1:
 			case RS::ARRAY_CUSTOM2:
 			case RS::ARRAY_CUSTOM3: {
-				uint32_t type = (p_format >> (ARRAY_FORMAT_CUSTOM_BASE + ARRAY_FORMAT_CUSTOM_BITS * (RS::ARRAY_CUSTOM0 - ai))) & ARRAY_FORMAT_CUSTOM_MASK;
+				uint32_t type = (p_format >> (ARRAY_FORMAT_CUSTOM_BASE + ARRAY_FORMAT_CUSTOM_BITS * (ai - RS::ARRAY_CUSTOM0))) & ARRAY_FORMAT_CUSTOM_MASK;
 				switch (type) {
 					case ARRAY_CUSTOM_RGBA8_UNORM:
 					case ARRAY_CUSTOM_RGBA8_SNORM:
@@ -527,14 +541,14 @@ Error RenderingServer::_surface_set_data(Array p_arrays, uint32_t p_format, uint
 						ERR_FAIL_COND_V(p_arrays[ai].get_type() != Variant::PACKED_FLOAT32_ARRAY, ERR_INVALID_PARAMETER);
 
 						Vector<float> array = p_arrays[ai];
-						int32_t s = ARRAY_CUSTOM_R_FLOAT - ai + 1;
+						int32_t s = type - ARRAY_CUSTOM_R_FLOAT + 1;
 
 						ERR_FAIL_COND_V(array.size() != p_vertex_array_len * s, ERR_INVALID_PARAMETER);
 
 						const float *src = array.ptr();
 
 						for (int i = 0; i < p_vertex_array_len; i++) {
-							memcpy(&aw[p_offsets[ai] + i * p_attrib_stride], &src[i * s], 4 * s);
+							memcpy(&aw[p_offsets[ai] + i * p_attrib_stride], &src[i * s], sizeof(float) * s);
 						}
 					} break;
 					default: {
@@ -543,27 +557,38 @@ Error RenderingServer::_surface_set_data(Array p_arrays, uint32_t p_format, uint
 
 			} break;
 			case RS::ARRAY_WEIGHTS: {
-				ERR_FAIL_COND_V(p_arrays[ai].get_type() != Variant::PACKED_FLOAT32_ARRAY, ERR_INVALID_PARAMETER);
-
+				Variant::Type type = p_arrays[ai].get_type();
+				ERR_FAIL_COND_V(type != Variant::PACKED_FLOAT32_ARRAY && type != Variant::PACKED_FLOAT64_ARRAY, ERR_INVALID_PARAMETER);
 				uint32_t bone_count = (p_format & ARRAY_FLAG_USE_8_BONE_WEIGHTS) ? 8 : 4;
+				if (type == Variant::PACKED_FLOAT32_ARRAY) {
+					Vector<float> array = p_arrays[ai];
+					ERR_FAIL_COND_V(array.size() != (int32_t)(p_vertex_array_len * bone_count), ERR_INVALID_PARAMETER);
+					const float *src = array.ptr();
+					{
+						uint16_t data[8];
+						for (int i = 0; i < p_vertex_array_len; i++) {
+							for (uint32_t j = 0; j < bone_count; j++) {
+								data[j] = CLAMP(src[i * bone_count + j] * 65535, 0, 65535);
+							}
 
-				Vector<real_t> array = p_arrays[ai];
-
-				ERR_FAIL_COND_V(array.size() != (int32_t)(p_vertex_array_len * bone_count), ERR_INVALID_PARAMETER);
-
-				const real_t *src = array.ptr();
-
-				{
-					uint16_t data[8];
-					for (int i = 0; i < p_vertex_array_len; i++) {
-						for (uint32_t j = 0; j < bone_count; j++) {
-							data[j] = CLAMP(src[i * bone_count + j] * 65535, 0, 65535);
+							memcpy(&sw[p_offsets[ai] + i * p_skin_stride], data, 2 * bone_count);
 						}
+					}
+				} else { // if (type == Variant::PACKED_FLOAT64_ARRAY)
+					Vector<double> array = p_arrays[ai];
+					ERR_FAIL_COND_V(array.size() != (int32_t)(p_vertex_array_len * bone_count), ERR_INVALID_PARAMETER);
+					const double *src = array.ptr();
+					{
+						uint16_t data[8];
+						for (int i = 0; i < p_vertex_array_len; i++) {
+							for (uint32_t j = 0; j < bone_count; j++) {
+								data[j] = CLAMP(src[i * bone_count + j] * 65535, 0, 65535);
+							}
 
-						memcpy(&sw[p_offsets[ai] + i * p_skin_stride], data, 2 * bone_count);
+							memcpy(&sw[p_offsets[ai] + i * p_skin_stride], data, 2 * bone_count);
+						}
 					}
 				}
-
 			} break;
 			case RS::ARRAY_BONES: {
 				ERR_FAIL_COND_V(p_arrays[ai].get_type() != Variant::PACKED_INT32_ARRAY && p_arrays[ai].get_type() != Variant::PACKED_FLOAT32_ARRAY, ERR_INVALID_PARAMETER);
@@ -913,6 +938,13 @@ Error RenderingServer::mesh_create_surface_data_from_arrays(SurfaceData *r_surfa
 		}
 	}
 
+	for (uint32_t i = 0; i < RS::ARRAY_CUSTOM_COUNT; ++i) {
+		// include custom array format type.
+		if (format & (1 << (ARRAY_CUSTOM0 + i))) {
+			format |= (RS::ARRAY_FORMAT_CUSTOM_MASK << (RS::ARRAY_FORMAT_CUSTOM_BASE + i * RS::ARRAY_FORMAT_CUSTOM_BITS)) & p_compress_format;
+		}
+	}
+
 	uint32_t offsets[RS::ARRAY_MAX];
 
 	uint32_t vertex_element_size;
@@ -972,10 +1004,10 @@ Error RenderingServer::mesh_create_surface_data_from_arrays(SurfaceData *r_surfa
 	if (index_array_len) {
 		List<Variant> keys;
 		p_lods.get_key_list(&keys);
-		for (List<Variant>::Element *E = keys.front(); E; E = E->next()) {
-			float distance = E->get();
+		for (const Variant &E : keys) {
+			float distance = E;
 			ERR_CONTINUE(distance <= 0.0);
-			Vector<int> indices = p_lods[E->get()];
+			Vector<int> indices = p_lods[E];
 			ERR_CONTINUE(indices.size() == 0);
 			uint32_t index_count = indices.size();
 			ERR_CONTINUE(index_count >= (uint32_t)index_array_len); //should be smaller..
@@ -1166,7 +1198,7 @@ Array RenderingServer::_get_array_from_surface(uint32_t p_format, Vector<uint8_t
 			case RS::ARRAY_CUSTOM1:
 			case RS::ARRAY_CUSTOM2:
 			case RS::ARRAY_CUSTOM3: {
-				uint32_t type = (p_format >> (ARRAY_FORMAT_CUSTOM_BASE + ARRAY_FORMAT_CUSTOM_BITS * (RS::ARRAY_CUSTOM0 - i))) & ARRAY_FORMAT_CUSTOM_MASK;
+				uint32_t type = (p_format >> (ARRAY_FORMAT_CUSTOM_BASE + ARRAY_FORMAT_CUSTOM_BITS * (i - RS::ARRAY_CUSTOM0))) & ARRAY_FORMAT_CUSTOM_MASK;
 				switch (type) {
 					case ARRAY_CUSTOM_RGBA8_UNORM:
 					case ARRAY_CUSTOM_RGBA8_SNORM:
@@ -1194,6 +1226,8 @@ Array RenderingServer::_get_array_from_surface(uint32_t p_format, Vector<uint8_t
 						uint32_t s = type - ARRAY_CUSTOM_R_FLOAT + 1;
 
 						Vector<float> arr;
+						arr.resize(s * p_vertex_len);
+
 						float *w = arr.ptrw();
 
 						for (int j = 0; j < p_vertex_len; j++) {
@@ -1440,6 +1474,11 @@ ShaderLanguage::DataType RenderingServer::global_variable_type_get_shader_dataty
 		default:
 			return ShaderLanguage::TYPE_MAX; //invalid or not found
 	}
+}
+
+RenderingDevice *RenderingServer::get_rendering_device() const {
+	// return the rendering device we're using globally
+	return RenderingDevice::get_singleton();
 }
 
 RenderingDevice *RenderingServer::create_local_rendering_device() const {
@@ -1854,6 +1893,14 @@ void RenderingServer::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("light_directional_set_blend_splits", "light", "enable"), &RenderingServer::light_directional_set_blend_splits);
 	ClassDB::bind_method(D_METHOD("light_directional_set_sky_only", "light", "enable"), &RenderingServer::light_directional_set_sky_only);
 
+	ClassDB::bind_method(D_METHOD("light_projectors_set_filter", "filter"), &RenderingServer::light_projectors_set_filter);
+
+	BIND_ENUM_CONSTANT(LIGHT_PROJECTOR_FILTER_NEAREST);
+	BIND_ENUM_CONSTANT(LIGHT_PROJECTOR_FILTER_NEAREST_MIPMAPS);
+	BIND_ENUM_CONSTANT(LIGHT_PROJECTOR_FILTER_LINEAR);
+	BIND_ENUM_CONSTANT(LIGHT_PROJECTOR_FILTER_LINEAR_MIPMAPS);
+	BIND_ENUM_CONSTANT(LIGHT_PROJECTOR_FILTER_LINEAR_MIPMAPS_ANISOTROPIC);
+
 	BIND_ENUM_CONSTANT(LIGHT_DIRECTIONAL);
 	BIND_ENUM_CONSTANT(LIGHT_OMNI);
 	BIND_ENUM_CONSTANT(LIGHT_SPOT);
@@ -1939,11 +1986,19 @@ void RenderingServer::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("decal_set_fade", "decal", "above", "below"), &RenderingServer::decal_set_fade);
 	ClassDB::bind_method(D_METHOD("decal_set_normal_fade", "decal", "fade"), &RenderingServer::decal_set_normal_fade);
 
+	ClassDB::bind_method(D_METHOD("decals_set_filter", "filter"), &RenderingServer::decals_set_filter);
+
 	BIND_ENUM_CONSTANT(DECAL_TEXTURE_ALBEDO);
 	BIND_ENUM_CONSTANT(DECAL_TEXTURE_NORMAL);
 	BIND_ENUM_CONSTANT(DECAL_TEXTURE_ORM);
 	BIND_ENUM_CONSTANT(DECAL_TEXTURE_EMISSION);
 	BIND_ENUM_CONSTANT(DECAL_TEXTURE_MAX);
+
+	BIND_ENUM_CONSTANT(DECAL_FILTER_NEAREST);
+	BIND_ENUM_CONSTANT(DECAL_FILTER_NEAREST_MIPMAPS);
+	BIND_ENUM_CONSTANT(DECAL_FILTER_LINEAR);
+	BIND_ENUM_CONSTANT(DECAL_FILTER_LINEAR_MIPMAPS);
+	BIND_ENUM_CONSTANT(DECAL_FILTER_LINEAR_MIPMAPS_ANISOTROPIC);
 
 	/* VOXEL GI API */
 
@@ -2097,6 +2152,7 @@ void RenderingServer::_bind_methods() {
 
 	ClassDB::bind_method(D_METHOD("viewport_create"), &RenderingServer::viewport_create);
 	ClassDB::bind_method(D_METHOD("viewport_set_use_xr", "viewport", "use_xr"), &RenderingServer::viewport_set_use_xr);
+	ClassDB::bind_method(D_METHOD("viewport_set_scale_3d", "viewport", "scale"), &RenderingServer::viewport_set_scale_3d);
 	ClassDB::bind_method(D_METHOD("viewport_set_size", "viewport", "width", "height"), &RenderingServer::viewport_set_size);
 	ClassDB::bind_method(D_METHOD("viewport_set_active", "viewport", "active"), &RenderingServer::viewport_set_active);
 	ClassDB::bind_method(D_METHOD("viewport_set_parent_viewport", "viewport", "parent_viewport"), &RenderingServer::viewport_set_parent_viewport);
@@ -2169,7 +2225,6 @@ void RenderingServer::_bind_methods() {
 	BIND_ENUM_CONSTANT(VIEWPORT_MSAA_2X);
 	BIND_ENUM_CONSTANT(VIEWPORT_MSAA_4X);
 	BIND_ENUM_CONSTANT(VIEWPORT_MSAA_8X);
-	BIND_ENUM_CONSTANT(VIEWPORT_MSAA_16X);
 	BIND_ENUM_CONSTANT(VIEWPORT_MSAA_MAX);
 
 	BIND_ENUM_CONSTANT(VIEWPORT_SCREEN_SPACE_AA_DISABLED);
@@ -2213,6 +2268,12 @@ void RenderingServer::_bind_methods() {
 	BIND_ENUM_CONSTANT(VIEWPORT_DEBUG_DRAW_CLUSTER_DECALS);
 	BIND_ENUM_CONSTANT(VIEWPORT_DEBUG_DRAW_CLUSTER_REFLECTION_PROBES);
 	BIND_ENUM_CONSTANT(VIEWPORT_DEBUG_DRAW_OCCLUDERS);
+
+	BIND_ENUM_CONSTANT(VIEWPORT_SCALE_3D_DISABLED);
+	BIND_ENUM_CONSTANT(VIEWPORT_SCALE_3D_75_PERCENT);
+	BIND_ENUM_CONSTANT(VIEWPORT_SCALE_3D_50_PERCENT);
+	BIND_ENUM_CONSTANT(VIEWPORT_SCALE_3D_33_PERCENT);
+	BIND_ENUM_CONSTANT(VIEWPORT_SCALE_3D_25_PERCENT);
 
 	/* SKY API */
 
@@ -2666,6 +2727,7 @@ void RenderingServer::_bind_methods() {
 
 	ClassDB::bind_method(D_METHOD("force_sync"), &RenderingServer::sync);
 	ClassDB::bind_method(D_METHOD("force_draw", "swap_buffers", "frame_step"), &RenderingServer::draw, DEFVAL(true), DEFVAL(0.0));
+	ClassDB::bind_method(D_METHOD("get_rendering_device"), &RenderingServer::get_rendering_device);
 	ClassDB::bind_method(D_METHOD("create_local_rendering_device"), &RenderingServer::create_local_rendering_device);
 }
 
@@ -2747,12 +2809,18 @@ RenderingServer::RenderingServer() {
 
 	GLOBAL_DEF("rendering/2d/shadow_atlas/size", 2048);
 
-	GLOBAL_DEF_RST("rendering/vulkan/rendering/back_end", 0);
-	GLOBAL_DEF_RST("rendering/vulkan/rendering/back_end.mobile", 1);
+	GLOBAL_DEF_RST_BASIC("rendering/vulkan/rendering/back_end", 0);
+	GLOBAL_DEF_RST_BASIC("rendering/vulkan/rendering/back_end.mobile", 1);
 	ProjectSettings::get_singleton()->set_custom_property_info("rendering/vulkan/rendering/back_end",
 			PropertyInfo(Variant::INT,
 					"rendering/vulkan/rendering/back_end",
-					PROPERTY_HINT_ENUM, "ForwardClustered,ForwardMobile"));
+					PROPERTY_HINT_ENUM, "Forward Clustered (Supports Desktop Only),Forward Mobile (Supports Desktop and Mobile)"));
+
+	GLOBAL_DEF("rendering/3d/viewport/scale", 0);
+	ProjectSettings::get_singleton()->set_custom_property_info("rendering/3d/viewport/scale",
+			PropertyInfo(Variant::INT,
+					"rendering/3d/viewport/scale",
+					PROPERTY_HINT_ENUM, "Disabled,75%,50%,33%,25%"));
 
 	GLOBAL_DEF("rendering/shader_compiler/shader_cache/enabled", true);
 	GLOBAL_DEF("rendering/shader_compiler/shader_cache/compress", true);
@@ -2785,13 +2853,13 @@ RenderingServer::RenderingServer() {
 	GLOBAL_DEF("rendering/driver/depth_prepass/enable", true);
 	GLOBAL_DEF("rendering/driver/depth_prepass/disable_for_vendors", "PowerVR,Mali,Adreno,Apple");
 
-	GLOBAL_DEF("rendering/textures/default_filters/use_nearest_mipmap_filter", false);
-	GLOBAL_DEF("rendering/textures/default_filters/anisotropic_filtering_level", 2);
-	ProjectSettings::get_singleton()->set_custom_property_info("rendering/textures/default_filters/anisotropic_filtering_level", PropertyInfo(Variant::INT, "rendering/textures/default_filters/anisotropic_filtering_level", PROPERTY_HINT_ENUM, "Disabled (Fastest),2x (Faster),4x (Fast),8x (Average),16x (Slow)"));
+	GLOBAL_DEF_RST("rendering/textures/default_filters/use_nearest_mipmap_filter", false);
+	GLOBAL_DEF_RST("rendering/textures/default_filters/anisotropic_filtering_level", 2);
+	ProjectSettings::get_singleton()->set_custom_property_info("rendering/textures/default_filters/anisotropic_filtering_level", PropertyInfo(Variant::INT, "rendering/textures/default_filters/anisotropic_filtering_level", PROPERTY_HINT_ENUM, String::utf8("Disabled (Fastest),2× (Faster),4× (Fast),8× (Average),16× (Slow)")));
 
 	GLOBAL_DEF("rendering/camera/depth_of_field/depth_of_field_bokeh_shape", 1);
-	ProjectSettings::get_singleton()->set_custom_property_info("rendering/camera/depth_of_field/depth_of_field_bokeh_shape", PropertyInfo(Variant::INT, "rendering/camera/depth_of_field/depth_of_field_bokeh_shape", PROPERTY_HINT_ENUM, "Box (Fast),Hexagon (Average),Circle (Slow)"));
-	GLOBAL_DEF("rendering/camera/depth_of_field/depth_of_field_bokeh_quality", 2);
+	ProjectSettings::get_singleton()->set_custom_property_info("rendering/camera/depth_of_field/depth_of_field_bokeh_shape", PropertyInfo(Variant::INT, "rendering/camera/depth_of_field/depth_of_field_bokeh_shape", PROPERTY_HINT_ENUM, "Box (Fast),Hexagon (Average),Circle (Slowest)"));
+	GLOBAL_DEF("rendering/camera/depth_of_field/depth_of_field_bokeh_quality", 1);
 	ProjectSettings::get_singleton()->set_custom_property_info("rendering/camera/depth_of_field/depth_of_field_bokeh_quality", PropertyInfo(Variant::INT, "rendering/camera/depth_of_field/depth_of_field_bokeh_quality", PROPERTY_HINT_ENUM, "Very Low (Fastest),Low (Fast),Medium (Average),High (Slow)"));
 	GLOBAL_DEF("rendering/camera/depth_of_field/depth_of_field_use_jitter", false);
 
@@ -2813,6 +2881,11 @@ RenderingServer::RenderingServer() {
 	GLOBAL_DEF("rendering/anti_aliasing/screen_space_roughness_limiter/limit", 0.18);
 	ProjectSettings::get_singleton()->set_custom_property_info("rendering/anti_aliasing/screen_space_roughness_limiter/amount", PropertyInfo(Variant::FLOAT, "rendering/anti_aliasing/screen_space_roughness_limiter/amount", PROPERTY_HINT_RANGE, "0.01,4.0,0.01"));
 	ProjectSettings::get_singleton()->set_custom_property_info("rendering/anti_aliasing/screen_space_roughness_limiter/limit", PropertyInfo(Variant::FLOAT, "rendering/anti_aliasing/screen_space_roughness_limiter/limit", PROPERTY_HINT_RANGE, "0.01,1.0,0.01"));
+
+	GLOBAL_DEF("rendering/textures/decals/filter", DECAL_FILTER_LINEAR_MIPMAPS);
+	ProjectSettings::get_singleton()->set_custom_property_info("rendering/textures/decals/filter", PropertyInfo(Variant::INT, "rendering/textures/decals/filter", PROPERTY_HINT_ENUM, "Nearest (Fast),Nearest+Mipmaps,Linear,Linear+Mipmaps,Linear+Mipmaps Anisotropic (Slow)"));
+	GLOBAL_DEF("rendering/textures/light_projectors/filter", LIGHT_PROJECTOR_FILTER_LINEAR_MIPMAPS);
+	ProjectSettings::get_singleton()->set_custom_property_info("rendering/textures/light_projectors/filter", PropertyInfo(Variant::INT, "rendering/textures/light_projectors/filter", PROPERTY_HINT_ENUM, "Nearest (Fast),Nearest+Mipmaps,Linear,Linear+Mipmaps,Linear+Mipmaps Anisotropic (Slow)"));
 
 	GLOBAL_DEF_RST("rendering/occlusion_culling/occlusion_rays_per_thread", 512);
 	GLOBAL_DEF_RST("rendering/occlusion_culling/bvh_build_quality", 2);

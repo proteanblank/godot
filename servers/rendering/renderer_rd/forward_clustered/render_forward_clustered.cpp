@@ -183,7 +183,7 @@ void RenderForwardClustered::RenderBufferDataForwardClustered::clear() {
 	}
 }
 
-void RenderForwardClustered::RenderBufferDataForwardClustered::configure(RID p_color_buffer, RID p_depth_buffer, int p_width, int p_height, RS::ViewportMSAA p_msaa, uint32_t p_view_count) {
+void RenderForwardClustered::RenderBufferDataForwardClustered::configure(RID p_color_buffer, RID p_depth_buffer, RID p_target_buffer, int p_width, int p_height, RS::ViewportMSAA p_msaa, uint32_t p_view_count) {
 	clear();
 
 	ERR_FAIL_COND_MSG(p_view_count != 1, "Multiple views is currently not supported in this renderer, please use the mobile renderer for VR support");
@@ -223,7 +223,6 @@ void RenderForwardClustered::RenderBufferDataForwardClustered::configure(RID p_c
 			RD::TEXTURE_SAMPLES_2,
 			RD::TEXTURE_SAMPLES_4,
 			RD::TEXTURE_SAMPLES_8,
-			RD::TEXTURE_SAMPLES_16
 		};
 
 		texture_samples = ts[p_msaa];
@@ -483,8 +482,8 @@ void RenderForwardClustered::_render_list_template(RenderingDevice::DrawListID p
 		}
 
 		if (material_uniform_set != prev_material_uniform_set) {
-			//update uniform set
-			if (material_uniform_set.is_valid()) {
+			// Update uniform set.
+			if (material_uniform_set.is_valid() && RD::get_singleton()->uniform_set_is_valid(material_uniform_set)) { // Material may not have a uniform set.
 				RD::get_singleton()->draw_list_bind_uniform_set(draw_list, material_uniform_set, MATERIAL_UNIFORM_SET);
 			}
 
@@ -588,11 +587,6 @@ void RenderForwardClustered::_setup_environment(const RenderDataRD *p_render_dat
 	RendererStorageRD::store_soft_shadow_kernel(directional_soft_shadow_kernel_get(), scene_state.ubo.directional_soft_shadow_kernel);
 	RendererStorageRD::store_soft_shadow_kernel(penumbra_shadow_kernel_get(), scene_state.ubo.penumbra_shadow_kernel);
 	RendererStorageRD::store_soft_shadow_kernel(soft_shadow_kernel_get(), scene_state.ubo.soft_shadow_kernel);
-
-	scene_state.ubo.directional_penumbra_shadow_samples = directional_penumbra_shadow_samples_get();
-	scene_state.ubo.directional_soft_shadow_samples = directional_soft_shadow_samples_get();
-	scene_state.ubo.penumbra_shadow_samples = penumbra_shadow_samples_get();
-	scene_state.ubo.soft_shadow_samples = soft_shadow_samples_get();
 
 	Size2 screen_pixel_size = Vector2(1.0, 1.0) / Size2(p_screen_size);
 	scene_state.ubo.screen_pixel_size[0] = screen_pixel_size.x;
@@ -1168,7 +1162,7 @@ void RenderForwardClustered::_render_scene(RenderDataRD *p_render_data, const Co
 		render_buffer = (RenderBufferDataForwardClustered *)render_buffers_get_data(p_render_data->render_buffers);
 	}
 	RendererSceneEnvironmentRD *env = get_environment(p_render_data->environment);
-	static const int texture_multisamples[RS::VIEWPORT_MSAA_MAX] = { 1, 2, 4, 8, 16 };
+	static const int texture_multisamples[RS::VIEWPORT_MSAA_MAX] = { 1, 2, 4, 8 };
 
 	//first of all, make a new render pass
 	//fill up ubo
@@ -1538,6 +1532,16 @@ void RenderForwardClustered::_render_scene(RenderDataRD *p_render_data, const Co
 		}
 	}
 
+	if (scene_state.used_screen_texture) {
+		// Copy screen texture to backbuffer so we can read from it
+		_render_buffers_copy_screen_texture(p_render_data);
+	}
+
+	if (scene_state.used_depth_texture) {
+		// Copy depth texture to backbuffer so we can read from it
+		_render_buffers_copy_depth_texture(p_render_data);
+	}
+
 	RENDER_TIMESTAMP("Render Transparent Pass");
 
 	RD::get_singleton()->draw_command_begin_label("Render Transparent Pass");
@@ -1560,6 +1564,14 @@ void RenderForwardClustered::_render_scene(RenderDataRD *p_render_data, const Co
 	}
 
 	RD::get_singleton()->draw_command_end_label();
+
+	if (p_render_data->render_buffers.is_valid()) {
+		_debug_draw_cluster(p_render_data->render_buffers);
+
+		RENDER_TIMESTAMP("Tonemap");
+
+		_render_buffers_post_process_and_tonemap(p_render_data);
+	}
 }
 
 void RenderForwardClustered::_render_shadow_begin() {
@@ -1942,15 +1954,54 @@ void RenderForwardClustered::_update_render_base_uniform_set() {
 		{
 			RD::Uniform u;
 			u.binding = 3;
-			u.uniform_type = RD::UNIFORM_TYPE_STORAGE_BUFFER;
-			u.ids.push_back(get_omni_light_buffer());
+			u.uniform_type = RD::UNIFORM_TYPE_SAMPLER;
+			RID sampler;
+			switch (decals_get_filter()) {
+				case RS::DECAL_FILTER_NEAREST: {
+					sampler = storage->sampler_rd_get_default(RS::CANVAS_ITEM_TEXTURE_FILTER_NEAREST, RS::CANVAS_ITEM_TEXTURE_REPEAT_DISABLED);
+				} break;
+				case RS::DECAL_FILTER_NEAREST_MIPMAPS: {
+					sampler = storage->sampler_rd_get_default(RS::CANVAS_ITEM_TEXTURE_FILTER_NEAREST_WITH_MIPMAPS, RS::CANVAS_ITEM_TEXTURE_REPEAT_DISABLED);
+				} break;
+				case RS::DECAL_FILTER_LINEAR: {
+					sampler = storage->sampler_rd_get_default(RS::CANVAS_ITEM_TEXTURE_FILTER_LINEAR, RS::CANVAS_ITEM_TEXTURE_REPEAT_DISABLED);
+				} break;
+				case RS::DECAL_FILTER_LINEAR_MIPMAPS: {
+					sampler = storage->sampler_rd_get_default(RS::CANVAS_ITEM_TEXTURE_FILTER_LINEAR_WITH_MIPMAPS, RS::CANVAS_ITEM_TEXTURE_REPEAT_DISABLED);
+				} break;
+				case RS::DECAL_FILTER_LINEAR_MIPMAPS_ANISOTROPIC: {
+					sampler = storage->sampler_rd_get_default(RS::CANVAS_ITEM_TEXTURE_FILTER_LINEAR_WITH_MIPMAPS_ANISOTROPIC, RS::CANVAS_ITEM_TEXTURE_REPEAT_DISABLED);
+				} break;
+			}
+
+			u.ids.push_back(sampler);
 			uniforms.push_back(u);
 		}
+
 		{
 			RD::Uniform u;
 			u.binding = 4;
-			u.uniform_type = RD::UNIFORM_TYPE_STORAGE_BUFFER;
-			u.ids.push_back(get_spot_light_buffer());
+			u.uniform_type = RD::UNIFORM_TYPE_SAMPLER;
+			RID sampler;
+			switch (light_projectors_get_filter()) {
+				case RS::LIGHT_PROJECTOR_FILTER_NEAREST: {
+					sampler = storage->sampler_rd_get_default(RS::CANVAS_ITEM_TEXTURE_FILTER_NEAREST, RS::CANVAS_ITEM_TEXTURE_REPEAT_DISABLED);
+				} break;
+				case RS::LIGHT_PROJECTOR_FILTER_NEAREST_MIPMAPS: {
+					sampler = storage->sampler_rd_get_default(RS::CANVAS_ITEM_TEXTURE_FILTER_NEAREST_WITH_MIPMAPS, RS::CANVAS_ITEM_TEXTURE_REPEAT_DISABLED);
+				} break;
+				case RS::LIGHT_PROJECTOR_FILTER_LINEAR: {
+					sampler = storage->sampler_rd_get_default(RS::CANVAS_ITEM_TEXTURE_FILTER_LINEAR, RS::CANVAS_ITEM_TEXTURE_REPEAT_DISABLED);
+				} break;
+				case RS::LIGHT_PROJECTOR_FILTER_LINEAR_MIPMAPS: {
+					sampler = storage->sampler_rd_get_default(RS::CANVAS_ITEM_TEXTURE_FILTER_LINEAR_WITH_MIPMAPS, RS::CANVAS_ITEM_TEXTURE_REPEAT_DISABLED);
+				} break;
+				case RS::LIGHT_PROJECTOR_FILTER_LINEAR_MIPMAPS_ANISOTROPIC: {
+					sampler = storage->sampler_rd_get_default(RS::CANVAS_ITEM_TEXTURE_FILTER_LINEAR_WITH_MIPMAPS_ANISOTROPIC, RS::CANVAS_ITEM_TEXTURE_REPEAT_DISABLED);
+				} break;
+			}
+
+			u.ids.push_back(sampler);
 			uniforms.push_back(u);
 		}
 
@@ -1958,33 +2009,48 @@ void RenderForwardClustered::_update_render_base_uniform_set() {
 			RD::Uniform u;
 			u.binding = 5;
 			u.uniform_type = RD::UNIFORM_TYPE_STORAGE_BUFFER;
-			u.ids.push_back(get_reflection_probe_buffer());
+			u.ids.push_back(get_omni_light_buffer());
 			uniforms.push_back(u);
 		}
 		{
 			RD::Uniform u;
 			u.binding = 6;
+			u.uniform_type = RD::UNIFORM_TYPE_STORAGE_BUFFER;
+			u.ids.push_back(get_spot_light_buffer());
+			uniforms.push_back(u);
+		}
+
+		{
+			RD::Uniform u;
+			u.binding = 7;
+			u.uniform_type = RD::UNIFORM_TYPE_STORAGE_BUFFER;
+			u.ids.push_back(get_reflection_probe_buffer());
+			uniforms.push_back(u);
+		}
+		{
+			RD::Uniform u;
+			u.binding = 8;
 			u.uniform_type = RD::UNIFORM_TYPE_UNIFORM_BUFFER;
 			u.ids.push_back(get_directional_light_buffer());
 			uniforms.push_back(u);
 		}
 		{
 			RD::Uniform u;
-			u.binding = 7;
+			u.binding = 9;
 			u.uniform_type = RD::UNIFORM_TYPE_STORAGE_BUFFER;
 			u.ids.push_back(scene_state.lightmap_buffer);
 			uniforms.push_back(u);
 		}
 		{
 			RD::Uniform u;
-			u.binding = 8;
+			u.binding = 10;
 			u.uniform_type = RD::UNIFORM_TYPE_STORAGE_BUFFER;
 			u.ids.push_back(scene_state.lightmap_capture_buffer);
 			uniforms.push_back(u);
 		}
 		{
 			RD::Uniform u;
-			u.binding = 9;
+			u.binding = 11;
 			u.uniform_type = RD::UNIFORM_TYPE_TEXTURE;
 			RID decal_atlas = storage->decal_atlas_get_texture();
 			u.ids.push_back(decal_atlas);
@@ -1992,7 +2058,7 @@ void RenderForwardClustered::_update_render_base_uniform_set() {
 		}
 		{
 			RD::Uniform u;
-			u.binding = 10;
+			u.binding = 12;
 			u.uniform_type = RD::UNIFORM_TYPE_TEXTURE;
 			RID decal_atlas = storage->decal_atlas_get_texture_srgb();
 			u.ids.push_back(decal_atlas);
@@ -2000,7 +2066,7 @@ void RenderForwardClustered::_update_render_base_uniform_set() {
 		}
 		{
 			RD::Uniform u;
-			u.binding = 11;
+			u.binding = 13;
 			u.uniform_type = RD::UNIFORM_TYPE_STORAGE_BUFFER;
 			u.ids.push_back(get_decal_buffer());
 			uniforms.push_back(u);
@@ -2009,7 +2075,7 @@ void RenderForwardClustered::_update_render_base_uniform_set() {
 		{
 			RD::Uniform u;
 			u.uniform_type = RD::UNIFORM_TYPE_STORAGE_BUFFER;
-			u.binding = 12;
+			u.binding = 14;
 			u.ids.push_back(storage->global_variables_get_storage_buffer());
 			uniforms.push_back(u);
 		}
@@ -2017,7 +2083,7 @@ void RenderForwardClustered::_update_render_base_uniform_set() {
 		{
 			RD::Uniform u;
 			u.uniform_type = RD::UNIFORM_TYPE_UNIFORM_BUFFER;
-			u.binding = 13;
+			u.binding = 15;
 			u.ids.push_back(sdfgi_get_ubo());
 			uniforms.push_back(u);
 		}
@@ -2162,7 +2228,8 @@ RID RenderForwardClustered::_setup_render_pass_uniform_set(RenderListType p_rend
 		RD::Uniform u;
 		u.binding = 9;
 		u.uniform_type = RD::UNIFORM_TYPE_TEXTURE;
-		RID texture = (false && rb && rb->depth.is_valid()) ? rb->depth : storage->texture_rd_get_default(RendererStorageRD::DEFAULT_RD_TEXTURE_WHITE);
+		RID dbt = rb ? render_buffers_get_back_depth_texture(p_render_data->render_buffers) : RID();
+		RID texture = (dbt.is_valid()) ? dbt : storage->texture_rd_get_default(RendererStorageRD::DEFAULT_RD_TEXTURE_WHITE);
 		u.ids.push_back(texture);
 		uniforms.push_back(u);
 	}
@@ -2484,7 +2551,7 @@ void RenderForwardClustered::_geometry_instance_add_surface_with_material(Geomet
 
 	SceneShaderForwardClustered::MaterialData *material_shadow = nullptr;
 	void *surface_shadow = nullptr;
-	if (!p_material->shader_data->uses_particle_trails && !p_material->shader_data->writes_modelview_or_projection && !p_material->shader_data->uses_vertex && !p_material->shader_data->uses_discard && !p_material->shader_data->uses_depth_pre_pass) {
+	if (!p_material->shader_data->uses_particle_trails && !p_material->shader_data->writes_modelview_or_projection && !p_material->shader_data->uses_vertex && !p_material->shader_data->uses_position && !p_material->shader_data->uses_discard && !p_material->shader_data->uses_depth_pre_pass) {
 		flags |= GeometryInstanceSurfaceDataCache::FLAG_USES_SHARED_SHADOW_MATERIAL;
 		material_shadow = (SceneShaderForwardClustered::MaterialData *)storage->material_get_data(scene_shader.default_material, RendererStorageRD::SHADER_TYPE_3D);
 
@@ -2939,6 +3006,48 @@ void RenderForwardClustered::geometry_instance_set_softshadow_projector_pairing(
 	_geometry_instance_mark_dirty(ginstance);
 }
 
+void RenderForwardClustered::_update_shader_quality_settings() {
+	Vector<RD::PipelineSpecializationConstant> spec_constants;
+
+	RD::PipelineSpecializationConstant sc;
+	sc.type = RD::PIPELINE_SPECIALIZATION_CONSTANT_TYPE_INT;
+
+	sc.constant_id = SPEC_CONSTANT_SOFT_SHADOW_SAMPLES;
+	sc.int_value = soft_shadow_samples_get();
+
+	spec_constants.push_back(sc);
+
+	sc.constant_id = SPEC_CONSTANT_PENUMBRA_SHADOW_SAMPLES;
+	sc.int_value = penumbra_shadow_samples_get();
+
+	spec_constants.push_back(sc);
+
+	sc.constant_id = SPEC_CONSTANT_DIRECTIONAL_SOFT_SHADOW_SAMPLES;
+	sc.int_value = directional_soft_shadow_samples_get();
+
+	spec_constants.push_back(sc);
+
+	sc.constant_id = SPEC_CONSTANT_DIRECTIONAL_PENUMBRA_SHADOW_SAMPLES;
+	sc.int_value = directional_penumbra_shadow_samples_get();
+
+	spec_constants.push_back(sc);
+
+	sc.type = RD::PIPELINE_SPECIALIZATION_CONSTANT_TYPE_BOOL;
+	sc.constant_id = SPEC_CONSTANT_DECAL_FILTER;
+	sc.bool_value = decals_get_filter() == RS::DECAL_FILTER_NEAREST_MIPMAPS || decals_get_filter() == RS::DECAL_FILTER_LINEAR_MIPMAPS || decals_get_filter() == RS::DECAL_FILTER_LINEAR_MIPMAPS_ANISOTROPIC;
+
+	spec_constants.push_back(sc);
+
+	sc.constant_id = SPEC_CONSTANT_PROJECTOR_FILTER;
+	sc.bool_value = light_projectors_get_filter() == RS::LIGHT_PROJECTOR_FILTER_NEAREST_MIPMAPS || light_projectors_get_filter() == RS::LIGHT_PROJECTOR_FILTER_LINEAR_MIPMAPS || light_projectors_get_filter() == RS::LIGHT_PROJECTOR_FILTER_LINEAR_MIPMAPS_ANISOTROPIC;
+
+	spec_constants.push_back(sc);
+
+	scene_shader.set_default_specialization_constants(spec_constants);
+
+	_base_uniforms_changed(); //also need this
+}
+
 RenderForwardClustered::RenderForwardClustered(RendererStorageRD *p_storage) :
 		RendererSceneRenderRD(p_storage) {
 	singleton = this;
@@ -2952,7 +3061,7 @@ RenderForwardClustered::RenderForwardClustered(RendererStorageRD *p_storage) :
 			defines += "\n#define USE_RADIANCE_CUBEMAP_ARRAY \n";
 		}
 		defines += "\n#define SDFGI_OCT_SIZE " + itos(gi.sdfgi_get_lightprobe_octahedron_size()) + "\n";
-		defines += "\n#define MAX_DIRECTIONAL_LIGHT_DATA_STRUCTS " + itos(get_max_directional_lights()) + "\n";
+		defines += "\n#define MAX_DIRECTIONAL_LIGHT_DATA_STRUCTS " + itos(MAX_DIRECTIONAL_LIGHTS) + "\n";
 
 		{
 			//lightmaps
@@ -2976,6 +3085,8 @@ RenderForwardClustered::RenderForwardClustered(RendererStorageRD *p_storage) :
 	}
 
 	render_list_thread_threshold = GLOBAL_GET("rendering/limits/forward_renderer/threaded_render_minimum_instances");
+
+	_update_shader_quality_settings();
 }
 
 RenderForwardClustered::~RenderForwardClustered() {

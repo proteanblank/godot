@@ -32,6 +32,7 @@
 #define EDITOR_RESOURCE_PICKER_H
 
 #include "editor_file_dialog.h"
+#include "quick_open.h"
 #include "scene/gui/box_container.h"
 #include "scene/gui/button.h"
 #include "scene/gui/popup_menu.h"
@@ -39,6 +40,8 @@
 
 class EditorResourcePicker : public HBoxContainer {
 	GDCLASS(EditorResourcePicker, HBoxContainer);
+
+	static HashMap<StringName, List<StringName>> allowed_types_cache;
 
 	String base_type;
 	RES edited_resource;
@@ -52,9 +55,11 @@ class EditorResourcePicker : public HBoxContainer {
 	TextureRect *preview_rect;
 	Button *edit_button;
 	EditorFileDialog *file_dialog = nullptr;
+	EditorQuickOpen *quick_open = nullptr;
 
 	enum MenuOption {
 		OBJ_MENU_LOAD,
+		OBJ_MENU_QUICKLOAD,
 		OBJ_MENU_EDIT,
 		OBJ_MENU_CLEAR,
 		OBJ_MENU_MAKE_UNIQUE,
@@ -67,12 +72,13 @@ class EditorResourcePicker : public HBoxContainer {
 		CONVERT_BASE_ID = 1000,
 	};
 
-	PopupMenu *edit_menu;
+	PopupMenu *edit_menu = nullptr;
 
 	void _update_resource();
 	void _update_resource_preview(const String &p_path, const Ref<Texture2D> &p_preview, const Ref<Texture2D> &p_small_preview, ObjectID p_obj);
 
 	void _resource_selected();
+	void _file_quick_selected();
 	void _file_selected(const String &p_path);
 
 	void _update_menu();
@@ -90,11 +96,15 @@ class EditorResourcePicker : public HBoxContainer {
 	bool can_drop_data_fw(const Point2 &p_point, const Variant &p_data, Control *p_from) const;
 	void drop_data_fw(const Point2 &p_point, const Variant &p_data, Control *p_from);
 
+	void _ensure_resource_menu();
+
 protected:
 	static void _bind_methods();
 	void _notification(int p_what);
 
 public:
+	static void clear_caches();
+
 	void set_base_type(const String &p_base_type);
 	String get_base_type() const;
 	Vector<String> get_allowed_types() const;
@@ -136,6 +146,25 @@ public:
 	Node *get_script_owner() const;
 
 	EditorScriptPicker();
+};
+
+class EditorShaderPicker : public EditorResourcePicker {
+	GDCLASS(EditorShaderPicker, EditorResourcePicker);
+
+	enum ExtraMenuOption {
+		OBJ_MENU_NEW_SHADER = 10,
+	};
+
+	ShaderMaterial *edited_material = nullptr;
+
+public:
+	virtual void set_create_options(Object *p_menu_node) override;
+	virtual bool handle_menu_selected(int p_which) override;
+
+	void set_edited_material(ShaderMaterial *p_material);
+	ShaderMaterial *get_edited_material() const;
+
+	EditorShaderPicker();
 };
 
 #endif // EDITOR_RESOURCE_PICKER_H

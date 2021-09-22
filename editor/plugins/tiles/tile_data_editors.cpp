@@ -110,11 +110,11 @@ void DummyObject::clear_dummy_properties() {
 void GenericTilePolygonEditor::_base_control_draw() {
 	ERR_FAIL_COND(!tile_set.is_valid());
 
-	real_t grab_threshold = EDITOR_GET("editors/poly_editor/point_grab_radius");
+	real_t grab_threshold = EDITOR_GET("editors/polygon_editor/point_grab_radius");
 
 	Color grid_color = EditorSettings::get_singleton()->get("editors/tiles_editor/grid_color");
-	const Ref<Texture2D> handle = get_theme_icon("EditorPathSharpHandle", "EditorIcons");
-	const Ref<Texture2D> add_handle = get_theme_icon("EditorHandleAdd", "EditorIcons");
+	const Ref<Texture2D> handle = get_theme_icon(SNAME("EditorPathSharpHandle"), SNAME("EditorIcons"));
+	const Ref<Texture2D> add_handle = get_theme_icon(SNAME("EditorHandleAdd"), SNAME("EditorIcons"));
 
 	Size2 tile_size = tile_set->get_tile_size();
 
@@ -124,7 +124,9 @@ void GenericTilePolygonEditor::_base_control_draw() {
 	base_control->draw_set_transform_matrix(xform);
 
 	// Draw the tile shape filled.
-	tile_set->draw_tile_shape(base_control, Rect2(-tile_size / 2, tile_size), Color(1.0, 1.0, 1.0, 0.3), true);
+	Transform2D tile_xform;
+	tile_xform.set_scale(tile_size);
+	tile_set->draw_tile_shape(base_control, tile_xform, Color(1.0, 1.0, 1.0, 0.3), true);
 
 	// Draw the background.
 	if (background_texture.is_valid()) {
@@ -195,8 +197,8 @@ void GenericTilePolygonEditor::_base_control_draw() {
 
 	// Draw the text on top of the selected point.
 	if (tinted_polygon_index >= 0) {
-		Ref<Font> font = get_theme_font("font", "Label");
-		int font_size = get_theme_font_size("font_size", "Label");
+		Ref<Font> font = get_theme_font(SNAME("font"), SNAME("Label"));
+		int font_size = get_theme_font_size(SNAME("font_size"), SNAME("Label"));
 		String text = multiple_polygon_mode ? vformat("%d:%d", tinted_polygon_index, tinted_point_index) : vformat("%d", tinted_point_index);
 		Size2 text_size = font->get_string_size(text, font_size);
 		base_control->draw_string(font, xform.xform(polygons[tinted_polygon_index][tinted_point_index]) - text_size * 0.5, text, HALIGN_LEFT, -1, font_size, Color(1.0, 1.0, 1.0, 0.5));
@@ -213,7 +215,7 @@ void GenericTilePolygonEditor::_base_control_draw() {
 
 	// Draw the tile shape line.
 	base_control->draw_set_transform_matrix(xform);
-	tile_set->draw_tile_shape(base_control, Rect2(-tile_size / 2, tile_size), grid_color, false);
+	tile_set->draw_tile_shape(base_control, tile_xform, grid_color, false);
 	base_control->draw_set_transform_matrix(Transform2D());
 }
 
@@ -262,7 +264,7 @@ void GenericTilePolygonEditor::_advanced_menu_item_pressed(int p_item_pressed) {
 }
 
 void GenericTilePolygonEditor::_grab_polygon_point(Vector2 p_pos, const Transform2D &p_polygon_xform, int &r_polygon_index, int &r_point_index) {
-	const real_t grab_threshold = EDITOR_GET("editors/poly_editor/point_grab_radius");
+	const real_t grab_threshold = EDITOR_GET("editors/polygon_editor/point_grab_radius");
 	r_polygon_index = -1;
 	r_point_index = -1;
 	float closest_distance = grab_threshold + 1.0;
@@ -280,7 +282,7 @@ void GenericTilePolygonEditor::_grab_polygon_point(Vector2 p_pos, const Transfor
 }
 
 void GenericTilePolygonEditor::_grab_polygon_segment_point(Vector2 p_pos, const Transform2D &p_polygon_xform, int &r_polygon_index, int &r_segment_index, Vector2 &r_point) {
-	const real_t grab_threshold = EDITOR_GET("editors/poly_editor/point_grab_radius");
+	const real_t grab_threshold = EDITOR_GET("editors/polygon_editor/point_grab_radius");
 
 	Point2 point = p_polygon_xform.affine_inverse().xform(p_pos);
 	r_polygon_index = -1;
@@ -340,7 +342,7 @@ void GenericTilePolygonEditor::_snap_to_half_pixel(Point2 &r_point) {
 }
 
 void GenericTilePolygonEditor::_base_control_gui_input(Ref<InputEvent> p_event) {
-	real_t grab_threshold = EDITOR_GET("editors/poly_editor/point_grab_radius");
+	real_t grab_threshold = EDITOR_GET("editors/polygon_editor/point_grab_radius");
 
 	hovered_polygon_index = -1;
 	hovered_point_index = -1;
@@ -413,7 +415,7 @@ void GenericTilePolygonEditor::_base_control_gui_input(Ref<InputEvent> p_event) 
 						undo_redo->add_undo_method(this, "remove_polygon", added);
 						undo_redo->add_undo_method(base_control, "update");
 						undo_redo->commit_action(false);
-						emit_signal("polygons_changed");
+						emit_signal(SNAME("polygons_changed"));
 					} else {
 						// Create a new point.
 						drag_type = DRAG_TYPE_CREATE_POINT;
@@ -460,7 +462,7 @@ void GenericTilePolygonEditor::_base_control_gui_input(Ref<InputEvent> p_event) 
 						undo_redo->add_do_method(base_control, "update");
 						undo_redo->add_undo_method(base_control, "update");
 						undo_redo->commit_action(false);
-						emit_signal("polygons_changed");
+						emit_signal(SNAME("polygons_changed"));
 					}
 				}
 			} else {
@@ -471,7 +473,7 @@ void GenericTilePolygonEditor::_base_control_gui_input(Ref<InputEvent> p_event) 
 					undo_redo->add_undo_method(this, "set_polygon", drag_polygon_index, drag_old_polygon);
 					undo_redo->add_undo_method(base_control, "update");
 					undo_redo->commit_action(false);
-					emit_signal("polygons_changed");
+					emit_signal(SNAME("polygons_changed"));
 				} else if (drag_type == DRAG_TYPE_CREATE_POINT) {
 					Point2 point = xform.affine_inverse().xform(mb->get_position());
 					float distance = grab_threshold * 2;
@@ -507,7 +509,7 @@ void GenericTilePolygonEditor::_base_control_gui_input(Ref<InputEvent> p_event) 
 						undo_redo->add_do_method(base_control, "update");
 						undo_redo->add_undo_method(base_control, "update");
 						undo_redo->commit_action(false);
-						emit_signal("polygons_changed");
+						emit_signal(SNAME("polygons_changed"));
 					} else {
 						drag_type = DRAG_TYPE_PAN;
 						drag_last_pos = mb->get_position();
@@ -615,12 +617,12 @@ void GenericTilePolygonEditor::set_multiple_polygon_mode(bool p_multiple_polygon
 void GenericTilePolygonEditor::_notification(int p_what) {
 	switch (p_what) {
 		case NOTIFICATION_READY:
-			button_create->set_icon(EditorNode::get_singleton()->get_gui_base()->get_theme_icon("CurveCreate", "EditorIcons"));
-			button_edit->set_icon(EditorNode::get_singleton()->get_gui_base()->get_theme_icon("CurveEdit", "EditorIcons"));
-			button_delete->set_icon(EditorNode::get_singleton()->get_gui_base()->get_theme_icon("CurveDelete", "EditorIcons"));
-			button_center_view->set_icon(EditorNode::get_singleton()->get_gui_base()->get_theme_icon("CenterView", "EditorIcons"));
-			button_pixel_snap->set_icon(EditorNode::get_singleton()->get_gui_base()->get_theme_icon("Snap", "EditorIcons"));
-			button_advanced_menu->set_icon(EditorNode::get_singleton()->get_gui_base()->get_theme_icon("GuiTabMenu", "EditorIcons"));
+			button_create->set_icon(EditorNode::get_singleton()->get_gui_base()->get_theme_icon(SNAME("CurveCreate"), SNAME("EditorIcons")));
+			button_edit->set_icon(EditorNode::get_singleton()->get_gui_base()->get_theme_icon(SNAME("CurveEdit"), SNAME("EditorIcons")));
+			button_delete->set_icon(EditorNode::get_singleton()->get_gui_base()->get_theme_icon(SNAME("CurveDelete"), SNAME("EditorIcons")));
+			button_center_view->set_icon(EditorNode::get_singleton()->get_gui_base()->get_theme_icon(SNAME("CenterView"), SNAME("EditorIcons")));
+			button_pixel_snap->set_icon(EditorNode::get_singleton()->get_gui_base()->get_theme_icon(SNAME("Snap"), SNAME("EditorIcons")));
+			button_advanced_menu->set_icon(EditorNode::get_singleton()->get_gui_base()->get_theme_icon(SNAME("GuiTabMenu"), SNAME("EditorIcons")));
 			break;
 	}
 }
@@ -702,7 +704,7 @@ GenericTilePolygonEditor::GenericTilePolygonEditor() {
 	root->add_child(editor_zoom_widget);
 
 	button_center_view = memnew(Button);
-	button_center_view->set_icon(EditorNode::get_singleton()->get_gui_base()->get_theme_icon("CenterView", "EditorIcons"));
+	button_center_view->set_icon(EditorNode::get_singleton()->get_gui_base()->get_theme_icon(SNAME("CenterView"), SNAME("EditorIcons")));
 	button_center_view->set_anchors_and_offsets_preset(Control::PRESET_TOP_RIGHT, Control::PRESET_MODE_MINSIZE, 5);
 	button_center_view->connect("pressed", callable_mp(this, &GenericTilePolygonEditor::_center_view));
 	button_center_view->set_flat(true);
@@ -963,7 +965,7 @@ void TileDataDefaultEditor::draw_over_tile(CanvasItem *p_canvas_item, Transform2
 		Rect2 rect = p_transform.xform(Rect2(Vector2(-size / 2, -size / 2), Vector2(size, size)));
 		p_canvas_item->draw_rect(rect, value);
 	} else {
-		Ref<Font> font = TileSetEditor::get_singleton()->get_theme_font("bold", "EditorFonts");
+		Ref<Font> font = TileSetEditor::get_singleton()->get_theme_font(SNAME("bold"), SNAME("EditorFonts"));
 		String text;
 		switch (value.get_type()) {
 			case Variant::INT:
@@ -1039,9 +1041,9 @@ void TileDataDefaultEditor::_notification(int p_what) {
 	switch (p_what) {
 		case NOTIFICATION_ENTER_TREE:
 		case NOTIFICATION_THEME_CHANGED:
-			picker_button->set_icon(get_theme_icon("ColorPick", "EditorIcons"));
-			tile_bool_checked = get_theme_icon("TileChecked", "EditorIcons");
-			tile_bool_unchecked = get_theme_icon("TileUnchecked", "EditorIcons");
+			picker_button->set_icon(get_theme_icon(SNAME("ColorPick"), SNAME("EditorIcons")));
+			tile_bool_checked = get_theme_icon(SNAME("TileChecked"), SNAME("EditorIcons"));
+			tile_bool_unchecked = get_theme_icon(SNAME("TileUnchecked"), SNAME("EditorIcons"));
 			break;
 		default:
 			break;
@@ -1050,7 +1052,7 @@ void TileDataDefaultEditor::_notification(int p_what) {
 
 TileDataDefaultEditor::TileDataDefaultEditor() {
 	label = memnew(Label);
-	label->set_text("Painting:");
+	label->set_text(TTR("Painting:"));
 	add_child(label);
 
 	toolbar->add_child(memnew(VSeparator));
@@ -1072,14 +1074,15 @@ void TileDataTextureOffsetEditor::draw_over_tile(CanvasItem *p_canvas_item, Tran
 	ERR_FAIL_COND(!tile_data);
 
 	Vector2i tile_set_tile_size = tile_set->get_tile_size();
-	Rect2i rect = Rect2i(-tile_set_tile_size / 2, tile_set_tile_size);
 	Color color = Color(1.0, 0.0, 0.0);
 	if (p_selected) {
 		Color grid_color = EditorSettings::get_singleton()->get("editors/tiles_editor/grid_color");
 		Color selection_color = Color().from_hsv(Math::fposmod(grid_color.get_h() + 0.5, 1.0), grid_color.get_s(), grid_color.get_v(), 1.0);
 		color = selection_color;
 	}
-	tile_set->draw_tile_shape(p_canvas_item, p_transform.xform(rect), color);
+	Transform2D tile_xform;
+	tile_xform.set_scale(tile_set_tile_size);
+	tile_set->draw_tile_shape(p_canvas_item, p_transform * tile_xform, color);
 }
 
 void TileDataPositionEditor::draw_over_tile(CanvasItem *p_canvas_item, Transform2D p_transform, TileMapCell p_cell, bool p_selected) {
@@ -1099,7 +1102,7 @@ void TileDataPositionEditor::draw_over_tile(CanvasItem *p_canvas_item, Transform
 		Color selection_color = Color().from_hsv(Math::fposmod(grid_color.get_h() + 0.5, 1.0), grid_color.get_s(), grid_color.get_v(), 1.0);
 		color = selection_color;
 	}
-	Ref<Texture2D> position_icon = TileSetEditor::get_singleton()->get_theme_icon("EditorPosition", "EditorIcons");
+	Ref<Texture2D> position_icon = TileSetEditor::get_singleton()->get_theme_icon(SNAME("EditorPosition"), SNAME("EditorIcons"));
 	p_canvas_item->draw_texture(position_icon, p_transform.xform(Vector2(value)) - position_icon->get_size() / 2, color);
 }
 
@@ -1113,7 +1116,7 @@ void TileDataYSortEditor::draw_over_tile(CanvasItem *p_canvas_item, Transform2D 
 		Color selection_color = Color().from_hsv(Math::fposmod(grid_color.get_h() + 0.5, 1.0), grid_color.get_s(), grid_color.get_v(), 1.0);
 		color = selection_color;
 	}
-	Ref<Texture2D> position_icon = TileSetEditor::get_singleton()->get_theme_icon("EditorPosition", "EditorIcons");
+	Ref<Texture2D> position_icon = TileSetEditor::get_singleton()->get_theme_icon(SNAME("EditorPosition"), SNAME("EditorIcons"));
 	p_canvas_item->draw_texture(position_icon, p_transform.xform(Vector2(0, tile_data->get_y_sort_origin())) - position_icon->get_size() / 2, color);
 }
 
@@ -1244,7 +1247,7 @@ void TileDataCollisionEditor::_polygons_changed() {
 		}
 	}
 
-	// Remove uneeded properties and their editors.
+	// Remove unneeded properties and their editors.
 	for (int i = polygon_editor->get_polygon_count(); dummy_object->has_dummy_property(vformat("polygon_%d_one_way", i)); i++) {
 		dummy_object->remove_dummy_property(vformat("polygon_%d_one_way", i));
 	}
@@ -1458,19 +1461,20 @@ void TileDataTerrainsEditor::_property_value_changed(StringName p_property, Vari
 		}
 		_update_terrain_selector();
 	}
-	emit_signal("needs_redraw");
+	emit_signal(SNAME("needs_redraw"));
 }
 
 void TileDataTerrainsEditor::_tile_set_changed() {
 	ERR_FAIL_COND(!tile_set.is_valid());
 
 	// Fix if wrong values are selected.
-	if (int(dummy_object->get("terrain_set")) > tile_set->get_terrain_sets_count()) {
+	int terrain_set = int(dummy_object->get("terrain_set"));
+	if (terrain_set >= tile_set->get_terrain_sets_count()) {
+		terrain_set = -1;
 		dummy_object->set("terrain_set", -1);
 	}
-	int terrain_set = int(dummy_object->get("terrain"));
 	if (terrain_set >= 0) {
-		if (int(dummy_object->get("terrain")) > tile_set->get_terrains_count(terrain_set)) {
+		if (int(dummy_object->get("terrain")) >= tile_set->get_terrains_count(terrain_set)) {
 			dummy_object->set("terrain", -1);
 		}
 	}
@@ -1491,7 +1495,7 @@ void TileDataTerrainsEditor::forward_draw_over_atlas(TileAtlasView *p_tile_atlas
 			TileData *tile_data = Object::cast_to<TileData>(p_tile_set_atlas_source->get_tile_data(hovered_coords, 0));
 			int terrain_set = tile_data->get_terrain_set();
 			Rect2i texture_region = p_tile_set_atlas_source->get_tile_texture_region(hovered_coords);
-			Vector2i position = (texture_region.position + texture_region.get_end()) / 2 + p_tile_set_atlas_source->get_tile_effective_texture_offset(hovered_coords, 0);
+			Vector2i position = texture_region.get_center() + p_tile_set_atlas_source->get_tile_effective_texture_offset(hovered_coords, 0);
 
 			if (terrain_set >= 0 && terrain_set == int(dummy_object->get("terrain_set"))) {
 				// Draw hovered bit.
@@ -1513,15 +1517,16 @@ void TileDataTerrainsEditor::forward_draw_over_atlas(TileAtlasView *p_tile_atlas
 				}
 			} else {
 				// Draw hovered tile.
-				Vector2i tile_size = tile_set->get_tile_size();
-				Rect2i rect = p_transform.xform(Rect2i(position - tile_size / 2, tile_size));
-				tile_set->draw_tile_shape(p_canvas_item, rect, Color(1.0, 1.0, 1.0, 0.5), true);
+				Transform2D tile_xform;
+				tile_xform.set_origin(position);
+				tile_xform.set_scale(tile_set->get_tile_size());
+				tile_set->draw_tile_shape(p_canvas_item, p_transform * tile_xform, Color(1.0, 1.0, 1.0, 0.5), true);
 			}
 		}
 	}
 
 	// Dim terrains with wrong terrain set.
-	Ref<Font> font = TileSetEditor::get_singleton()->get_theme_font("bold", "EditorFonts");
+	Ref<Font> font = TileSetEditor::get_singleton()->get_theme_font(SNAME("bold"), SNAME("EditorFonts"));
 	for (int i = 0; i < p_tile_set_atlas_source->get_tiles_count(); i++) {
 		Vector2i coords = p_tile_set_atlas_source->get_tile_id(i);
 		if (coords != hovered_coords) {
@@ -1535,7 +1540,7 @@ void TileDataTerrainsEditor::forward_draw_over_atlas(TileAtlasView *p_tile_atlas
 				// Text
 				p_canvas_item->draw_set_transform_matrix(Transform2D());
 				Rect2i texture_region = p_tile_set_atlas_source->get_tile_texture_region(coords);
-				Vector2i position = (texture_region.position + texture_region.get_end()) / 2 + p_tile_set_atlas_source->get_tile_effective_texture_offset(coords, 0);
+				Vector2i position = texture_region.get_center() + p_tile_set_atlas_source->get_tile_effective_texture_offset(coords, 0);
 
 				Color color = Color(1, 1, 1);
 				String text;
@@ -1627,7 +1632,7 @@ void TileDataTerrainsEditor::forward_draw_over_atlas(TileAtlasView *p_tile_atlas
 			Vector2i coords = E->get().get_atlas_coords();
 
 			Rect2i texture_region = p_tile_set_atlas_source->get_tile_texture_region(coords);
-			Vector2i position = (texture_region.position + texture_region.get_end()) / 2 + p_tile_set_atlas_source->get_tile_effective_texture_offset(coords, 0);
+			Vector2i position = texture_region.get_center() + p_tile_set_atlas_source->get_tile_effective_texture_offset(coords, 0);
 
 			for (int i = 0; i < TileSet::CELL_NEIGHBOR_MAX; i++) {
 				TileSet::CellNeighbor bit = TileSet::CellNeighbor(i);
@@ -1663,7 +1668,7 @@ void TileDataTerrainsEditor::forward_draw_over_alternatives(TileAtlasView *p_til
 			TileData *tile_data = Object::cast_to<TileData>(p_tile_set_atlas_source->get_tile_data(hovered_coords, hovered_alternative));
 			int terrain_set = tile_data->get_terrain_set();
 			Rect2i texture_region = p_tile_atlas_view->get_alternative_tile_rect(hovered_coords, hovered_alternative);
-			Vector2i position = (texture_region.position + texture_region.get_end()) / 2 + p_tile_set_atlas_source->get_tile_effective_texture_offset(hovered_coords, hovered_alternative);
+			Vector2i position = texture_region.get_center() + p_tile_set_atlas_source->get_tile_effective_texture_offset(hovered_coords, hovered_alternative);
 
 			if (terrain_set == int(dummy_object->get("terrain_set"))) {
 				// Draw hovered bit.
@@ -1685,15 +1690,16 @@ void TileDataTerrainsEditor::forward_draw_over_alternatives(TileAtlasView *p_til
 				}
 			} else {
 				// Draw hovered tile.
-				Vector2i tile_size = tile_set->get_tile_size();
-				Rect2i rect = p_transform.xform(Rect2i(position - tile_size / 2, tile_size));
-				tile_set->draw_tile_shape(p_canvas_item, rect, Color(1.0, 1.0, 1.0, 0.5), true);
+				Transform2D tile_xform;
+				tile_xform.set_origin(position);
+				tile_xform.set_scale(tile_set->get_tile_size());
+				tile_set->draw_tile_shape(p_canvas_item, p_transform * tile_xform, Color(1.0, 1.0, 1.0, 0.5), true);
 			}
 		}
 	}
 
 	// Dim terrains with wrong terrain set.
-	Ref<Font> font = TileSetEditor::get_singleton()->get_theme_font("bold", "EditorFonts");
+	Ref<Font> font = TileSetEditor::get_singleton()->get_theme_font(SNAME("bold"), SNAME("EditorFonts"));
 	for (int i = 0; i < p_tile_set_atlas_source->get_tiles_count(); i++) {
 		Vector2i coords = p_tile_set_atlas_source->get_tile_id(i);
 		for (int j = 1; j < p_tile_set_atlas_source->get_alternative_tiles_count(coords); j++) {
@@ -1709,7 +1715,7 @@ void TileDataTerrainsEditor::forward_draw_over_alternatives(TileAtlasView *p_til
 					// Text
 					p_canvas_item->draw_set_transform_matrix(Transform2D());
 					Rect2i texture_region = p_tile_atlas_view->get_alternative_tile_rect(coords, alternative_tile);
-					Vector2i position = (texture_region.position + texture_region.get_end()) / 2 + p_tile_set_atlas_source->get_tile_effective_texture_offset(coords, 0);
+					Vector2i position = texture_region.get_center() + p_tile_set_atlas_source->get_tile_effective_texture_offset(coords, 0);
 
 					Color color = Color(1, 1, 1);
 					String text;
@@ -1790,7 +1796,7 @@ void TileDataTerrainsEditor::forward_painting_atlas_gui_input(TileAtlasView *p_t
 
 						// Set the terrains bits.
 						Rect2i texture_region = p_tile_set_atlas_source->get_tile_texture_region(coords);
-						Vector2i position = (texture_region.position + texture_region.get_end()) / 2 + p_tile_set_atlas_source->get_tile_effective_texture_offset(coords, 0);
+						Vector2i position = texture_region.get_center() + p_tile_set_atlas_source->get_tile_effective_texture_offset(coords, 0);
 						for (int j = 0; j < TileSet::CELL_NEIGHBOR_MAX; j++) {
 							TileSet::CellNeighbor bit = TileSet::CellNeighbor(j);
 							if (tile_data->is_valid_peering_bit_terrain(bit)) {
@@ -1818,7 +1824,7 @@ void TileDataTerrainsEditor::forward_painting_atlas_gui_input(TileAtlasView *p_t
 						TileData *tile_data = Object::cast_to<TileData>(p_tile_set_atlas_source->get_tile_data(coords, 0));
 						int terrain_set = tile_data->get_terrain_set();
 						Rect2i texture_region = p_tile_set_atlas_source->get_tile_texture_region(coords);
-						Vector2i position = (texture_region.position + texture_region.get_end()) / 2 + p_tile_set_atlas_source->get_tile_effective_texture_offset(coords, 0);
+						Vector2i position = texture_region.get_center() + p_tile_set_atlas_source->get_tile_effective_texture_offset(coords, 0);
 						dummy_object->set("terrain_set", terrain_set);
 						dummy_object->set("terrain", -1);
 						for (int i = 0; i < TileSet::CELL_NEIGHBOR_MAX; i++) {
@@ -1916,7 +1922,7 @@ void TileDataTerrainsEditor::forward_painting_atlas_gui_input(TileAtlasView *p_t
 
 								// Set the terrain bit.
 								Rect2i texture_region = p_tile_set_atlas_source->get_tile_texture_region(coords);
-								Vector2i position = (texture_region.position + texture_region.get_end()) / 2 + p_tile_set_atlas_source->get_tile_effective_texture_offset(coords, 0);
+								Vector2i position = texture_region.get_center() + p_tile_set_atlas_source->get_tile_effective_texture_offset(coords, 0);
 
 								for (int i = 0; i < TileSet::CELL_NEIGHBOR_MAX; i++) {
 									TileSet::CellNeighbor bit = TileSet::CellNeighbor(i);
@@ -2049,7 +2055,7 @@ void TileDataTerrainsEditor::forward_painting_atlas_gui_input(TileAtlasView *p_t
 							TileSet::CellNeighbor bit = TileSet::CellNeighbor(i);
 							if (tile_set->is_valid_peering_bit_terrain(terrain_set, bit)) {
 								Rect2i texture_region = p_tile_set_atlas_source->get_tile_texture_region(coords);
-								Vector2i position = (texture_region.position + texture_region.get_end()) / 2 + p_tile_set_atlas_source->get_tile_effective_texture_offset(coords, 0);
+								Vector2i position = texture_region.get_center() + p_tile_set_atlas_source->get_tile_effective_texture_offset(coords, 0);
 
 								Vector<Vector2> polygon = tile_set->get_terrain_bit_polygon(terrain_set, bit);
 								for (int j = 0; j < polygon.size(); j++) {
@@ -2132,7 +2138,7 @@ void TileDataTerrainsEditor::forward_painting_alternatives_gui_input(TileAtlasVi
 
 					// Set the terrains bits.
 					Rect2i texture_region = p_tile_atlas_view->get_alternative_tile_rect(coords, alternative_tile);
-					Vector2i position = (texture_region.position + texture_region.get_end()) / 2 + p_tile_set_atlas_source->get_tile_effective_texture_offset(coords, alternative_tile);
+					Vector2i position = texture_region.get_center() + p_tile_set_atlas_source->get_tile_effective_texture_offset(coords, alternative_tile);
 					for (int j = 0; j < TileSet::CELL_NEIGHBOR_MAX; j++) {
 						TileSet::CellNeighbor bit = TileSet::CellNeighbor(j);
 						if (tile_data->is_valid_peering_bit_terrain(bit)) {
@@ -2161,7 +2167,7 @@ void TileDataTerrainsEditor::forward_painting_alternatives_gui_input(TileAtlasVi
 						TileData *tile_data = Object::cast_to<TileData>(p_tile_set_atlas_source->get_tile_data(coords, alternative_tile));
 						int terrain_set = tile_data->get_terrain_set();
 						Rect2i texture_region = p_tile_atlas_view->get_alternative_tile_rect(coords, alternative_tile);
-						Vector2i position = (texture_region.position + texture_region.get_end()) / 2 + p_tile_set_atlas_source->get_tile_effective_texture_offset(coords, alternative_tile);
+						Vector2i position = texture_region.get_center() + p_tile_set_atlas_source->get_tile_effective_texture_offset(coords, alternative_tile);
 						dummy_object->set("terrain_set", terrain_set);
 						dummy_object->set("terrain", -1);
 						for (int i = 0; i < TileSet::CELL_NEIGHBOR_MAX; i++) {
@@ -2236,7 +2242,7 @@ void TileDataTerrainsEditor::forward_painting_alternatives_gui_input(TileAtlasVi
 
 							// Set the terrain bit.
 							Rect2i texture_region = p_tile_atlas_view->get_alternative_tile_rect(coords, alternative_tile);
-							Vector2i position = (texture_region.position + texture_region.get_end()) / 2 + p_tile_set_atlas_source->get_tile_effective_texture_offset(coords, alternative_tile);
+							Vector2i position = texture_region.get_center() + p_tile_set_atlas_source->get_tile_effective_texture_offset(coords, alternative_tile);
 							for (int i = 0; i < TileSet::CELL_NEIGHBOR_MAX; i++) {
 								TileSet::CellNeighbor bit = TileSet::CellNeighbor(i);
 								if (tile_set->is_valid_peering_bit_terrain(terrain_set, bit)) {
@@ -2303,7 +2309,7 @@ void TileDataTerrainsEditor::_notification(int p_what) {
 	switch (p_what) {
 		case NOTIFICATION_ENTER_TREE:
 		case NOTIFICATION_THEME_CHANGED:
-			picker_button->set_icon(get_theme_icon("ColorPick", "EditorIcons"));
+			picker_button->set_icon(get_theme_icon(SNAME("ColorPick"), SNAME("EditorIcons")));
 			break;
 		default:
 			break;

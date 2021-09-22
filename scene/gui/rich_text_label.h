@@ -85,7 +85,6 @@ public:
 protected:
 	void _notification(int p_what);
 	static void _bind_methods();
-	void _validate_property(PropertyInfo &property) const override;
 
 private:
 	struct Item;
@@ -161,7 +160,7 @@ private:
 
 	struct ItemImage : public Item {
 		Ref<Texture2D> image;
-		VAlign inline_align = VALIGN_TOP;
+		InlineAlign inline_align = INLINE_ALIGN_CENTER;
 		Size2 size;
 		Color color;
 		ItemImage() { type = ITEM_IMAGE; }
@@ -248,7 +247,7 @@ private:
 
 		int total_width = 0;
 		int total_height = 0;
-		VAlign inline_align = VALIGN_TOP;
+		InlineAlign inline_align = INLINE_ALIGN_TOP;
 		ItemTable() { type = ITEM_TABLE; }
 	};
 
@@ -260,7 +259,7 @@ private:
 	};
 
 	struct ItemFX : public Item {
-		float elapsed_time = 0.f;
+		double elapsed_time = 0.f;
 	};
 
 	struct ItemShake : public ItemFX {
@@ -268,6 +267,7 @@ private:
 		float rate = 0.0f;
 		uint64_t _current_rng = 0;
 		uint64_t _previous_rng = 0;
+		Vector2 prev_off;
 
 		ItemShake() { type = ITEM_SHAKE; }
 
@@ -290,6 +290,7 @@ private:
 	struct ItemWave : public ItemFX {
 		float frequency = 1.0f;
 		float amplitude = 1.0f;
+		Vector2 prev_off;
 
 		ItemWave() { type = ITEM_WAVE; }
 	};
@@ -297,6 +298,7 @@ private:
 	struct ItemTornado : public ItemFX {
 		float radius = 1.0f;
 		float frequency = 1.0f;
+		Vector2 prev_off;
 
 		ItemTornado() { type = ITEM_TORNADO; }
 	};
@@ -363,7 +365,7 @@ private:
 	ItemMeta *meta_hovering = nullptr;
 	Variant current_meta;
 
-	Vector<Ref<RichTextEffect>> custom_effects;
+	Array custom_effects;
 
 	void _invalidate_current_line(ItemFrame *p_frame);
 	void _validate_line_caches(ItemFrame *p_frame);
@@ -440,10 +442,10 @@ private:
 	void _fetch_item_fx_stack(Item *p_item, Vector<ItemFX *> &r_stack);
 
 	void _update_scroll();
-	void _update_fx(ItemFrame *p_frame, float p_delta_time);
+	void _update_fx(ItemFrame *p_frame, double p_delta_time);
 	void _scroll_changed(double);
 
-	void _gui_input(Ref<InputEvent> p_event);
+	virtual void gui_input(const Ref<InputEvent> &p_event) override;
 	Item *_get_next_item(Item *p_item, bool p_free = false) const;
 	Item *_get_prev_item(Item *p_item, bool p_free = false) const;
 
@@ -452,18 +454,21 @@ private:
 	virtual Dictionary parse_expressions_for_values(Vector<String> p_expressions);
 
 	void _draw_fbg_boxes(RID p_ci, RID p_rid, Vector2 line_off, Item *it_from, Item *it_to, int start, int end, int fbg_flag);
-
+#ifndef DISABLE_DEPRECATED
+	// Kept for compatibility from 3.x to 4.0.
+	bool _set(const StringName &p_name, const Variant &p_value);
+#endif
 	bool use_bbcode = false;
-	String bbcode;
+	String text;
 
 	int fixed_width = -1;
 
 	bool fit_content_height = false;
 
 public:
-	String get_text();
+	String get_parsed_text() const;
 	void add_text(const String &p_text);
-	void add_image(const Ref<Texture2D> &p_image, const int p_width = 0, const int p_height = 0, const Color &p_color = Color(1.0, 1.0, 1.0), VAlign p_align = VALIGN_TOP);
+	void add_image(const Ref<Texture2D> &p_image, const int p_width = 0, const int p_height = 0, const Color &p_color = Color(1.0, 1.0, 1.0), InlineAlign p_align = INLINE_ALIGN_CENTER);
 	void add_newline();
 	bool remove_line(const int p_line);
 	void push_dropcap(const String &p_string, const Ref<Font> &p_font, int p_size, const Rect2 &p_dropcap_margins = Rect2(), const Color &p_color = Color(1, 1, 1), int p_ol_size = 0, const Color &p_ol_color = Color(0, 0, 0, 0));
@@ -484,7 +489,7 @@ public:
 	void push_indent(int p_level);
 	void push_list(int p_level, ListType p_list, bool p_capitalize);
 	void push_meta(const Variant &p_meta);
-	void push_table(int p_columns, VAlign p_align = VALIGN_TOP);
+	void push_table(int p_columns, InlineAlign p_align = INLINE_ALIGN_TOP);
 	void push_fade(int p_start_index, int p_length);
 	void push_shake(int p_strength, float p_rate);
 	void push_wave(float p_frequency, float p_amplitude);
@@ -548,15 +553,13 @@ public:
 	void selection_copy();
 
 	Error parse_bbcode(const String &p_bbcode);
-	Error append_bbcode(const String &p_bbcode);
+	Error append_text(const String &p_bbcode);
 
 	void set_use_bbcode(bool p_enable);
 	bool is_using_bbcode() const;
 
-	void set_bbcode(const String &p_bbcode);
-	String get_bbcode() const;
-
-	void set_text(const String &p_string);
+	void set_text(const String &p_bbcode);
+	String get_text() const;
 
 	void set_text_direction(TextDirection p_text_direction);
 	TextDirection get_text_direction() const;
@@ -577,8 +580,8 @@ public:
 	void set_percent_visible(float p_percent);
 	float get_percent_visible() const;
 
-	void set_effects(const Vector<Variant> &effects);
-	Vector<Variant> get_effects();
+	void set_effects(Array p_effects);
+	Array get_effects();
 
 	void install_effect(const Variant effect);
 

@@ -165,7 +165,6 @@ private:
 	void _create_undo_state();
 
 	int _get_menu_action_accelerator(const String &p_action);
-	void _generate_context_menu();
 
 	void _shape();
 	void _fit_to_width();
@@ -198,10 +197,12 @@ private:
 	void _backspace(bool p_word = false, bool p_all_to_left = false);
 	void _delete(bool p_word = false, bool p_all_to_right = false);
 
+	void _ensure_menu();
+
 protected:
 	void _notification(int p_what);
 	static void _bind_methods();
-	void _gui_input(Ref<InputEvent> p_event);
+	virtual void gui_input(const Ref<InputEvent> &p_event) override;
 
 	bool _set(const StringName &p_name, const Variant &p_value);
 	bool _get(const StringName &p_name, Variant &r_ret) const;
@@ -222,6 +223,7 @@ public:
 	void set_context_menu_enabled(bool p_enable);
 	bool is_context_menu_enabled();
 	PopupMenu *get_menu() const;
+	bool is_menu_visible() const;
 
 	void select(int p_from = 0, int p_to = -1);
 	void select_all();
@@ -283,6 +285,8 @@ public:
 	void copy_text();
 	void cut_text();
 	void paste_text();
+	bool has_undo() const;
+	bool has_redo() const;
 	void undo();
 	void redo();
 

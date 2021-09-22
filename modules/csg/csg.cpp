@@ -42,7 +42,7 @@ inline static bool is_snapable(const Vector3 &p_point1, const Vector3 &p_point2,
 
 inline static Vector2 interpolate_segment_uv(const Vector2 p_segement_points[2], const Vector2 p_uvs[2], const Vector2 &p_interpolation_point) {
 	float segment_length = (p_segement_points[1] - p_segement_points[0]).length();
-	if (segment_length < CMP_EPSILON) {
+	if (p_segement_points[0].is_equal_approx(p_segement_points[1])) {
 		return p_uvs[0];
 	}
 
@@ -53,13 +53,13 @@ inline static Vector2 interpolate_segment_uv(const Vector2 p_segement_points[2],
 }
 
 inline static Vector2 interpolate_triangle_uv(const Vector2 p_vertices[3], const Vector2 p_uvs[3], const Vector2 &p_interpolation_point) {
-	if (p_interpolation_point.distance_squared_to(p_vertices[0]) < CMP_EPSILON2) {
+	if (p_interpolation_point.is_equal_approx(p_vertices[0])) {
 		return p_uvs[0];
 	}
-	if (p_interpolation_point.distance_squared_to(p_vertices[1]) < CMP_EPSILON2) {
+	if (p_interpolation_point.is_equal_approx(p_vertices[1])) {
 		return p_uvs[1];
 	}
-	if (p_interpolation_point.distance_squared_to(p_vertices[2]) < CMP_EPSILON2) {
+	if (p_interpolation_point.is_equal_approx(p_vertices[2])) {
 		return p_uvs[2];
 	}
 
@@ -517,7 +517,7 @@ int CSGBrushOperation::MeshMerge::_create_bvh(FaceBVH *facebvhptr, FaceBVH **fac
 	int index = r_max_alloc++;
 	FaceBVH *_new = &facebvhptr[index];
 	_new->aabb = aabb;
-	_new->center = aabb.position + aabb.size * 0.5;
+	_new->center = aabb.get_center();
 	_new->face = -1;
 	_new->left = left;
 	_new->right = right;
@@ -530,8 +530,8 @@ void CSGBrushOperation::MeshMerge::_add_distance(List<real_t> &r_intersectionsA,
 	List<real_t> &intersections = p_from_B ? r_intersectionsB : r_intersectionsA;
 
 	// Check if distance exists.
-	for (const List<real_t>::Element *E = intersections.front(); E; E = E->next()) {
-		if (Math::is_equal_approx(**E, p_distance)) {
+	for (const real_t E : intersections) {
+		if (Math::is_equal_approx(E, p_distance)) {
 			return;
 		}
 	}
@@ -589,7 +589,7 @@ bool CSGBrushOperation::MeshMerge::_bvh_inside(FaceBVH *facebvhptr, int p_max_de
 							Vector3 intersection_point;
 
 							// Check if faces are co-planar.
-							if ((current_normal - face_normal).length_squared() < CMP_EPSILON2 &&
+							if (current_normal.is_equal_approx(face_normal) &&
 									is_point_in_triangle(face_center, current_points)) {
 								// Only add an intersection if not a B face.
 								if (!face.from_b) {
@@ -678,7 +678,7 @@ void CSGBrushOperation::MeshMerge::mark_inside_faces() {
 		facebvh[i].aabb.position = points[faces[i].points[0]];
 		facebvh[i].aabb.expand_to(points[faces[i].points[1]]);
 		facebvh[i].aabb.expand_to(points[faces[i].points[2]]);
-		facebvh[i].center = facebvh[i].aabb.position + facebvh[i].aabb.size * 0.5;
+		facebvh[i].center = facebvh[i].aabb.get_center();
 		facebvh[i].aabb.grow_by(vertex_snap);
 		facebvh[i].next = -1;
 

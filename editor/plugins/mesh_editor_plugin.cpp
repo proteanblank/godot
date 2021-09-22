@@ -32,7 +32,7 @@
 
 #include "editor/editor_scale.h"
 
-void MeshEditor::_gui_input(Ref<InputEvent> p_event) {
+void MeshEditor::gui_input(const Ref<InputEvent> &p_event) {
 	ERR_FAIL_COND(p_event.is_null());
 
 	Ref<InputEventMouseMotion> mm = p_event;
@@ -55,10 +55,10 @@ void MeshEditor::_notification(int p_what) {
 		if (first_enter) {
 			//it's in propertyeditor so. could be moved around
 
-			light_1_switch->set_normal_texture(get_theme_icon("MaterialPreviewLight1", "EditorIcons"));
-			light_1_switch->set_pressed_texture(get_theme_icon("MaterialPreviewLight1Off", "EditorIcons"));
-			light_2_switch->set_normal_texture(get_theme_icon("MaterialPreviewLight2", "EditorIcons"));
-			light_2_switch->set_pressed_texture(get_theme_icon("MaterialPreviewLight2Off", "EditorIcons"));
+			light_1_switch->set_normal_texture(get_theme_icon(SNAME("MaterialPreviewLight1"), SNAME("EditorIcons")));
+			light_1_switch->set_pressed_texture(get_theme_icon(SNAME("MaterialPreviewLight1Off"), SNAME("EditorIcons")));
+			light_2_switch->set_normal_texture(get_theme_icon(SNAME("MaterialPreviewLight2"), SNAME("EditorIcons")));
+			light_2_switch->set_pressed_texture(get_theme_icon(SNAME("MaterialPreviewLight2Off"), SNAME("EditorIcons")));
 			first_enter = false;
 		}
 	}
@@ -80,7 +80,7 @@ void MeshEditor::edit(Ref<Mesh> p_mesh) {
 	_update_rotation();
 
 	AABB aabb = mesh->get_aabb();
-	Vector3 ofs = aabb.position + aabb.size * 0.5;
+	Vector3 ofs = aabb.get_center();
 	float m = aabb.get_longest_axis_size();
 	if (m != 0) {
 		m = 1.0 / m;
@@ -101,10 +101,6 @@ void MeshEditor::_button_pressed(Node *p_button) {
 	if (p_button == light_2_switch) {
 		light2->set_visible(!light_2_switch->is_pressed());
 	}
-}
-
-void MeshEditor::_bind_methods() {
-	ClassDB::bind_method(D_METHOD("_gui_input"), &MeshEditor::_gui_input);
 }
 
 MeshEditor::MeshEditor() {

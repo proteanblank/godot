@@ -81,7 +81,7 @@ private:
 
 	Ref<XRInterface> primary_interface; /* we'll identify one interface as primary, this will be used by our viewports */
 
-	real_t world_scale; /* scale by which we multiply our tracker positions */
+	double world_scale; /* scale by which we multiply our tracker positions */
 	Transform3D world_origin; /* our world origin point, maps a location in our virtual world to the origin point in our real world tracking volume */
 	Transform3D reference_frame; /* our reference frame */
 
@@ -107,8 +107,8 @@ public:
 
 		I may remove access to this property in GDScript in favour of exposing it on the XROrigin3D node
 	*/
-	real_t get_world_scale() const;
-	void set_world_scale(real_t p_world_scale);
+	double get_world_scale() const;
+	void set_world_scale(double p_world_scale);
 
 	/*
 		The world maps the 0,0,0 coordinate of our real world coordinate system for our tracking volume to a location in our
@@ -159,7 +159,6 @@ public:
 	*/
 	Ref<XRInterface> get_primary_interface() const;
 	void set_primary_interface(const Ref<XRInterface> &p_primary_interface);
-	void clear_primary_interface_if(const Ref<XRInterface> &p_primary_interface); /* this is automatically called if an interface destructs */
 
 	/*
 		Our trackers are objects that expose the orientation and position of physical devices such as controller, anchor points, etc.

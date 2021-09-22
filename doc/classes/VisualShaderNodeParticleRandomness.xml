@@ -6,8 +6,6 @@
 	</description>
 	<tutorials>
 	</tutorials>
-	<methods>
-	</methods>
 	<members>
 		<member name="op_type" type="int" setter="set_op_type" getter="get_op_type" enum="VisualShaderNodeParticleRandomness.OpType" default="0">
 		</member>
@@ -18,6 +16,7 @@
 		<constant name="OP_TYPE_VECTOR" value="1" enum="OpType">
 		</constant>
 		<constant name="OP_TYPE_MAX" value="2" enum="OpType">
+			Represents the size of the [enum OpType] enum.
 		</constant>
 	</constants>
 </class>

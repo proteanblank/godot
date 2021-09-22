@@ -39,6 +39,7 @@
 #include "core/os/main_loop.h"
 #include "core/os/os.h"
 #include "core/string/ustring.h"
+#include "core/variant/variant.h"
 
 #include "tests/test_macros.h"
 
@@ -350,13 +351,47 @@ TEST_CASE("[String] Insertion") {
 }
 
 TEST_CASE("[String] Number to string") {
+	CHECK(String::num(0) == "0");
+	CHECK(String::num(0.0) == "0"); // No trailing zeros.
+	CHECK(String::num(-0.0) == "-0"); // Includes sign even for zero.
 	CHECK(String::num(3.141593) == "3.141593");
 	CHECK(String::num(3.141593, 3) == "3.142");
-	CHECK(String::num_real(3.141593) == "3.141593");
 	CHECK(String::num_scientific(30000000) == "3e+07");
 	CHECK(String::num_int64(3141593) == "3141593");
 	CHECK(String::num_int64(0xA141593, 16) == "a141593");
 	CHECK(String::num_int64(0xA141593, 16, true) == "A141593");
+	CHECK(String::num(42.100023, 4) == "42.1"); // No trailing zeros.
+
+	// String::num_real tests.
+	CHECK(String::num_real(3.141593) == "3.141593");
+	CHECK(String::num_real(3.141) == "3.141"); // No trailing zeros.
+#ifdef REAL_T_IS_DOUBLE
+	CHECK_MESSAGE(String::num_real(Math_PI) == "3.14159265358979", "Prints the appropriate amount of digits for real_t = double.");
+	CHECK_MESSAGE(String::num_real(3.1415f) == "3.14149999618530", "Prints more digits of 32-bit float when real_t = double (ones that would be reliable for double).");
+#else
+	CHECK_MESSAGE(String::num_real(Math_PI) == "3.141593", "Prints the appropriate amount of digits for real_t = float.");
+	CHECK_MESSAGE(String::num_real(3.1415f) == "3.1415", "Prints only reliable digits of 32-bit float when real_t = float.");
+#endif // REAL_T_IS_DOUBLE
+
+	// Checks doubles with many decimal places.
+	CHECK(String::num(0.0000012345432123454321, -1) == "0.00000123454321"); // -1 uses 14 as sane default.
+	CHECK(String::num(0.0000012345432123454321) == "0.00000123454321"); // -1 is the default value.
+	CHECK(String::num(-0.0000012345432123454321) == "-0.00000123454321");
+	CHECK(String::num(-10000.0000012345432123454321) == "-10000.0000012345");
+	CHECK(String::num(0.0000000000012345432123454321) == "0.00000000000123");
+	CHECK(String::num(0.0000000000012345432123454321, 3) == "0");
+
+	// Note: When relevant (remainder > 0.5), the last digit gets rounded up,
+	// which can also lead to not include a trailing zero, e.g. "...89" -> "...9".
+	CHECK(String::num(0.0000056789876567898765) == "0.00000567898766"); // Should round last digit.
+	CHECK(String::num(10000.000005678999999999) == "10000.000005679"); // We cut at ...789|99 which is rounded to ...79, so only 13 decimals.
+	CHECK(String::num(42.12999999, 6) == "42.13"); // Also happens with lower decimals count.
+
+	// 32 is MAX_DECIMALS. We can't reliably store that many so we can't compare against a string,
+	// but we can check that the string length is 34 (32 + 2 for "0.").
+	CHECK(String::num(0.00000123456789987654321123456789987654321, 32).length() == 34);
+	CHECK(String::num(0.00000123456789987654321123456789987654321, 42).length() == 34); // Should enforce MAX_DECIMALS.
+	CHECK(String::num(10000.00000123456789987654321123456789987654321, 42).length() == 38); // 32 decimals + "10000.".
 }
 
 TEST_CASE("[String] String to integer") {
@@ -1118,20 +1153,20 @@ TEST_CASE("[String] dedent") {
 }
 
 TEST_CASE("[String] Path functions") {
-	static const char *path[4] = { "C:\\Godot\\project\\test.tscn", "/Godot/project/test.xscn", "../Godot/project/test.scn", "Godot\\test.doc" };
-	static const char *base_dir[4] = { "C:\\Godot\\project", "/Godot/project", "../Godot/project", "Godot" };
-	static const char *base_name[4] = { "C:\\Godot\\project\\test", "/Godot/project/test", "../Godot/project/test", "Godot\\test" };
-	static const char *ext[4] = { "tscn", "xscn", "scn", "doc" };
-	static const char *file[4] = { "test.tscn", "test.xscn", "test.scn", "test.doc" };
-	static const bool abs[4] = { true, true, false, false };
+	static const char *path[7] = { "C:\\Godot\\project\\test.tscn", "/Godot/project/test.xscn", "../Godot/project/test.scn", "Godot\\test.doc", "C:\\test.", "res://test", "/.test" };
+	static const char *base_dir[7] = { "C:\\Godot\\project", "/Godot/project", "../Godot/project", "Godot", "C:\\", "res://", "/" };
+	static const char *base_name[7] = { "C:\\Godot\\project\\test", "/Godot/project/test", "../Godot/project/test", "Godot\\test", "C:\\test", "res://test", "/" };
+	static const char *ext[7] = { "tscn", "xscn", "scn", "doc", "", "", "test" };
+	static const char *file[7] = { "test.tscn", "test.xscn", "test.scn", "test.doc", "test.", "test", ".test" };
+	static const bool abs[7] = { true, true, false, false, true, true, true };
 
-	for (int i = 0; i < 4; i++) {
+	for (int i = 0; i < 7; i++) {
 		CHECK(String(path[i]).get_base_dir() == base_dir[i]);
 		CHECK(String(path[i]).get_basename() == base_name[i]);
 		CHECK(String(path[i]).get_extension() == ext[i]);
 		CHECK(String(path[i]).get_file() == file[i]);
 		CHECK(String(path[i]).is_absolute_path() == abs[i]);
-		CHECK(String(path[i]).is_rel_path() != abs[i]);
+		CHECK(String(path[i]).is_relative_path() != abs[i]);
 		CHECK(String(path[i]).simplify_path().get_base_dir().plus_file(file[i]) == String(path[i]).simplify_path());
 	}
 
@@ -1345,6 +1380,78 @@ TEST_CASE("[String] validate_node_name") {
 
 	String name_with_invalid_chars = "Name with invalid characters :.@removed!";
 	CHECK(name_with_invalid_chars.validate_node_name() == "Name with invalid characters removed!");
+}
+
+TEST_CASE("[String] Variant indexed get") {
+	Variant s = String("abcd");
+	bool valid = false;
+	bool oob = true;
+
+	String r = s.get_indexed(1, valid, oob);
+
+	CHECK(valid);
+	CHECK_FALSE(oob);
+	CHECK_EQ(r, String("b"));
+}
+
+TEST_CASE("[String] Variant validated indexed get") {
+	Variant s = String("abcd");
+
+	Variant::ValidatedIndexedGetter getter = Variant::get_member_validated_indexed_getter(Variant::STRING);
+
+	Variant r;
+	bool oob = true;
+	getter(&s, 1, &r, &oob);
+
+	CHECK_FALSE(oob);
+	CHECK_EQ(r, String("b"));
+}
+
+TEST_CASE("[String] Variant ptr indexed get") {
+	String s("abcd");
+
+	Variant::PTRIndexedGetter getter = Variant::get_member_ptr_indexed_getter(Variant::STRING);
+
+	String r;
+	getter(&s, 1, &r);
+
+	CHECK_EQ(r, String("b"));
+}
+
+TEST_CASE("[String] Variant indexed set") {
+	Variant s = String("abcd");
+	bool valid = false;
+	bool oob = true;
+
+	s.set_indexed(1, String("z"), valid, oob);
+
+	CHECK(valid);
+	CHECK_FALSE(oob);
+	CHECK_EQ(s, String("azcd"));
+}
+
+TEST_CASE("[String] Variant validated indexed set") {
+	Variant s = String("abcd");
+
+	Variant::ValidatedIndexedSetter setter = Variant::get_member_validated_indexed_setter(Variant::STRING);
+
+	Variant v = String("z");
+	bool oob = true;
+	setter(&s, 1, &v, &oob);
+
+	CHECK_FALSE(oob);
+	CHECK_EQ(s, String("azcd"));
+}
+
+TEST_CASE("[String] Variant ptr indexed set") {
+	String s("abcd");
+
+	Variant::PTRIndexedSetter setter = Variant::get_member_ptr_indexed_setter(Variant::STRING);
+
+	String v("z");
+	setter(&s, 1, &v);
+
+	CHECK_EQ(s, String("azcd"));
 }
 } // namespace TestString
 

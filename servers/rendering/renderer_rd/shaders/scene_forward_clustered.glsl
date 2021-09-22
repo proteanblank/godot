@@ -118,7 +118,7 @@ void main() {
 
 	mat3 world_normal_matrix;
 	if (bool(instances.data[instance_index].flags & INSTANCE_FLAGS_NON_UNIFORM_SCALE)) {
-		world_normal_matrix = inverse(mat3(world_matrix));
+		world_normal_matrix = transpose(inverse(mat3(world_matrix)));
 	} else {
 		world_normal_matrix = mat3(world_matrix);
 	}
@@ -356,12 +356,26 @@ void main() {
 
 #VERSION_DEFINES
 
-/* Specialization Constants */
+/* Specialization Constants (Toggles) */
 
 layout(constant_id = 0) const bool sc_use_forward_gi = false;
 layout(constant_id = 1) const bool sc_use_light_projector = false;
 layout(constant_id = 2) const bool sc_use_light_soft_shadows = false;
 layout(constant_id = 3) const bool sc_use_directional_soft_shadows = false;
+
+/* Specialization Constants (Values) */
+
+layout(constant_id = 6) const uint sc_soft_shadow_samples = 4;
+layout(constant_id = 7) const uint sc_penumbra_shadow_samples = 4;
+
+layout(constant_id = 8) const uint sc_directional_soft_shadow_samples = 4;
+layout(constant_id = 9) const uint sc_directional_penumbra_shadow_samples = 4;
+
+layout(constant_id = 10) const bool sc_decal_use_mipmaps = true;
+layout(constant_id = 11) const bool sc_projector_use_mipmaps = true;
+
+// not used in clustered renderer but we share some code with the mobile renderer that requires this.
+const float sc_luminance_multiplier = 1.0;
 
 #include "scene_forward_clustered_inc.glsl"
 
@@ -454,6 +468,11 @@ layout(location = 0) out vec4 frag_color;
 #include "scene_forward_aa_inc.glsl"
 
 #if !defined(MODE_RENDER_DEPTH) && !defined(MODE_UNSHADED)
+
+/* Make a default specular mode SPECULAR_SCHLICK_GGX. */
+#if !defined(SPECULAR_DISABLED) && !defined(SPECULAR_SCHLICK_GGX) && !defined(SPECULAR_BLINN) && !defined(SPECULAR_PHONG) && !defined(SPECULAR_TOON)
+#define SPECULAR_SCHLICK_GGX
+#endif
 
 #include "scene_forward_lights_inc.glsl"
 
@@ -796,25 +815,35 @@ void main() {
 					continue; //out of decal
 				}
 
-				//we need ddx/ddy for mipmaps, so simulate them
-				vec2 ddx = (decals.data[decal_index].xform * vec4(vertex_ddx, 0.0)).xz;
-				vec2 ddy = (decals.data[decal_index].xform * vec4(vertex_ddy, 0.0)).xz;
-
 				float fade = pow(1.0 - (uv_local.y > 0.0 ? uv_local.y : -uv_local.y), uv_local.y > 0.0 ? decals.data[decal_index].upper_fade : decals.data[decal_index].lower_fade);
 
 				if (decals.data[decal_index].normal_fade > 0.0) {
 					fade *= smoothstep(decals.data[decal_index].normal_fade, 1.0, dot(normal_interp, decals.data[decal_index].normal) * 0.5 + 0.5);
 				}
 
+				//we need ddx/ddy for mipmaps, so simulate them
+				vec2 ddx = (decals.data[decal_index].xform * vec4(vertex_ddx, 0.0)).xz;
+				vec2 ddy = (decals.data[decal_index].xform * vec4(vertex_ddy, 0.0)).xz;
+
 				if (decals.data[decal_index].albedo_rect != vec4(0.0)) {
 					//has albedo
-					vec4 decal_albedo = textureGrad(sampler2D(decal_atlas_srgb, material_samplers[SAMPLER_LINEAR_WITH_MIPMAPS_CLAMP]), uv_local.xz * decals.data[decal_index].albedo_rect.zw + decals.data[decal_index].albedo_rect.xy, ddx * decals.data[decal_index].albedo_rect.zw, ddy * decals.data[decal_index].albedo_rect.zw);
+					vec4 decal_albedo;
+					if (sc_decal_use_mipmaps) {
+						decal_albedo = textureGrad(sampler2D(decal_atlas_srgb, decal_sampler), uv_local.xz * decals.data[decal_index].albedo_rect.zw + decals.data[decal_index].albedo_rect.xy, ddx * decals.data[decal_index].albedo_rect.zw, ddy * decals.data[decal_index].albedo_rect.zw);
+					} else {
+						decal_albedo = textureLod(sampler2D(decal_atlas_srgb, decal_sampler), uv_local.xz * decals.data[decal_index].albedo_rect.zw + decals.data[decal_index].albedo_rect.xy, 0.0);
+					}
 					decal_albedo *= decals.data[decal_index].modulate;
 					decal_albedo.a *= fade;
 					albedo = mix(albedo, decal_albedo.rgb, decal_albedo.a * decals.data[decal_index].albedo_mix);
 
 					if (decals.data[decal_index].normal_rect != vec4(0.0)) {
-						vec3 decal_normal = textureGrad(sampler2D(decal_atlas, material_samplers[SAMPLER_LINEAR_WITH_MIPMAPS_CLAMP]), uv_local.xz * decals.data[decal_index].normal_rect.zw + decals.data[decal_index].normal_rect.xy, ddx * decals.data[decal_index].normal_rect.zw, ddy * decals.data[decal_index].normal_rect.zw).xyz;
+						vec3 decal_normal;
+						if (sc_decal_use_mipmaps) {
+							decal_normal = textureGrad(sampler2D(decal_atlas, decal_sampler), uv_local.xz * decals.data[decal_index].normal_rect.zw + decals.data[decal_index].normal_rect.xy, ddx * decals.data[decal_index].normal_rect.zw, ddy * decals.data[decal_index].normal_rect.zw).xyz;
+						} else {
+							decal_normal = textureLod(sampler2D(decal_atlas, decal_sampler), uv_local.xz * decals.data[decal_index].normal_rect.zw + decals.data[decal_index].normal_rect.xy, 0.0).xyz;
+						}
 						decal_normal.xy = decal_normal.xy * vec2(2.0, -2.0) - vec2(1.0, -1.0); //users prefer flipped y normal maps in most authoring software
 						decal_normal.z = sqrt(max(0.0, 1.0 - dot(decal_normal.xy, decal_normal.xy)));
 						//convert to view space, use xzy because y is up
@@ -824,7 +853,12 @@ void main() {
 					}
 
 					if (decals.data[decal_index].orm_rect != vec4(0.0)) {
-						vec3 decal_orm = textureGrad(sampler2D(decal_atlas, material_samplers[SAMPLER_LINEAR_WITH_MIPMAPS_CLAMP]), uv_local.xz * decals.data[decal_index].orm_rect.zw + decals.data[decal_index].orm_rect.xy, ddx * decals.data[decal_index].orm_rect.zw, ddy * decals.data[decal_index].orm_rect.zw).xyz;
+						vec3 decal_orm;
+						if (sc_decal_use_mipmaps) {
+							decal_orm = textureGrad(sampler2D(decal_atlas, decal_sampler), uv_local.xz * decals.data[decal_index].orm_rect.zw + decals.data[decal_index].orm_rect.xy, ddx * decals.data[decal_index].orm_rect.zw, ddy * decals.data[decal_index].orm_rect.zw).xyz;
+						} else {
+							decal_orm = textureLod(sampler2D(decal_atlas, decal_sampler), uv_local.xz * decals.data[decal_index].orm_rect.zw + decals.data[decal_index].orm_rect.xy, 0.0).xyz;
+						}
 						ao = mix(ao, decal_orm.r, decal_albedo.a);
 						roughness = mix(roughness, decal_orm.g, decal_albedo.a);
 						metallic = mix(metallic, decal_orm.b, decal_albedo.a);
@@ -833,7 +867,11 @@ void main() {
 
 				if (decals.data[decal_index].emission_rect != vec4(0.0)) {
 					//emission is additive, so its independent from albedo
-					emission += textureGrad(sampler2D(decal_atlas_srgb, material_samplers[SAMPLER_LINEAR_WITH_MIPMAPS_CLAMP]), uv_local.xz * decals.data[decal_index].emission_rect.zw + decals.data[decal_index].emission_rect.xy, ddx * decals.data[decal_index].emission_rect.zw, ddy * decals.data[decal_index].emission_rect.zw).xyz * decals.data[decal_index].emission_energy * fade;
+					if (sc_decal_use_mipmaps) {
+						emission += textureGrad(sampler2D(decal_atlas_srgb, decal_sampler), uv_local.xz * decals.data[decal_index].emission_rect.zw + decals.data[decal_index].emission_rect.xy, ddx * decals.data[decal_index].emission_rect.zw, ddy * decals.data[decal_index].emission_rect.zw).xyz * decals.data[decal_index].emission_energy * fade;
+					} else {
+						emission += textureLod(sampler2D(decal_atlas_srgb, decal_sampler), uv_local.xz * decals.data[decal_index].emission_rect.zw + decals.data[decal_index].emission_rect.xy, 0.0).xyz * decals.data[decal_index].emission_energy * fade;
+					}
 				}
 			}
 		}
@@ -846,7 +884,7 @@ void main() {
 
 #ifdef NORMAL_USED
 	if (scene_data.roughness_limiter_enabled) {
-		//http://www.jp.square-enix.com/tech/library/pdf/ImprovedGeometricSpecularAA.pdf
+		//https://www.jp.square-enix.com/tech/library/pdf/ImprovedGeometricSpecularAA.pdf
 		float roughness2 = roughness * roughness;
 		vec3 dndu = dFdx(normal), dndv = dFdy(normal);
 		float variance = scene_data.roughness_limiter_amount * (dot(dndu, dndu) + dot(dndv, dndv));
@@ -865,6 +903,7 @@ void main() {
 
 	if (scene_data.use_reflection_cubemap) {
 		vec3 ref_vec = reflect(-view, normal);
+		float horizon = min(1.0 + dot(ref_vec, normal), 1.0);
 		ref_vec = scene_data.radiance_inverse_xform * ref_vec;
 #ifdef USE_RADIANCE_CUBEMAP_ARRAY
 
@@ -877,6 +916,7 @@ void main() {
 		specular_light = textureLod(samplerCube(radiance_cubemap, material_samplers[SAMPLER_LINEAR_WITH_MIPMAPS_CLAMP]), ref_vec, roughness * MAX_ROUGHNESS_LOD).rgb;
 
 #endif //USE_RADIANCE_CUBEMAP_ARRAY
+		specular_light *= horizon * horizon;
 		specular_light *= scene_data.ambient_light_color_energy.a;
 	}
 
@@ -1184,7 +1224,7 @@ void main() {
 		specular_light *= specular * metallic * albedo * 2.0;
 #else
 
-		// scales the specular reflections, needs to be be computed before lighting happens,
+		// scales the specular reflections, needs to be computed before lighting happens,
 		// but after environment, GI, and reflection probes are added
 		// Environment brdf approximation (Lazarov 2013)
 		// see https://www.unrealengine.com/en-US/blog/physically-based-shading-on-mobile
@@ -1564,7 +1604,7 @@ void main() {
 					continue; // Statically baked light and object uses lightmap, skip
 				}
 
-				float shadow = light_process_omni_shadow(light_index, vertex, view);
+				float shadow = light_process_omni_shadow(light_index, vertex, normal);
 
 				shadow = blur_shadow(shadow);
 
@@ -1640,7 +1680,7 @@ void main() {
 					continue; // Statically baked light and object uses lightmap, skip
 				}
 
-				float shadow = light_process_spot_shadow(light_index, vertex, view);
+				float shadow = light_process_spot_shadow(light_index, vertex, normal);
 
 				shadow = blur_shadow(shadow);
 

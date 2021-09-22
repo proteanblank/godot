@@ -275,22 +275,21 @@ Error VulkanContext::_obtain_vulkan_version() {
 		if (res == VK_SUCCESS) {
 			vulkan_major = VK_VERSION_MAJOR(api_version);
 			vulkan_minor = VK_VERSION_MINOR(api_version);
-			uint32_t vulkan_patch = VK_VERSION_PATCH(api_version);
-
-			print_line("Vulkan API " + itos(vulkan_major) + "." + itos(vulkan_minor) + "." + itos(vulkan_patch));
+			vulkan_patch = VK_VERSION_PATCH(api_version);
 		} else {
 			// according to the documentation this shouldn't fail with anything except a memory allocation error
 			// in which case we're in deep trouble anyway
 			ERR_FAIL_V(ERR_CANT_CREATE);
 		}
 	} else {
-		print_line("vkEnumerateInstanceVersion not available, assuming Vulkan 1.0");
+		print_line("vkEnumerateInstanceVersion not available, assuming Vulkan 1.0.");
 	}
 
 	// we don't go above 1.2
 	if ((vulkan_major > 1) || (vulkan_major == 1 && vulkan_minor > 2)) {
 		vulkan_major = 1;
 		vulkan_minor = 2;
+		vulkan_patch = 0;
 	}
 
 	return OK;
@@ -577,26 +576,22 @@ Error VulkanContext::_check_capabilities() {
 			multiview_capabilities.max_view_count = multiviewProperties.maxMultiviewViewCount;
 			multiview_capabilities.max_instance_count = multiviewProperties.maxMultiviewInstanceIndex;
 
-#ifdef DEBUG_ENABLED
-			print_line("- Vulkan multiview supported:");
-			print_line("  max view count: " + itos(multiview_capabilities.max_view_count));
-			print_line("  max instances: " + itos(multiview_capabilities.max_instance_count));
+			print_verbose("- Vulkan multiview supported:");
+			print_verbose("  max view count: " + itos(multiview_capabilities.max_view_count));
+			print_verbose("  max instances: " + itos(multiview_capabilities.max_instance_count));
 		} else {
-			print_line("- Vulkan multiview not supported");
-#endif
+			print_verbose("- Vulkan multiview not supported");
 		}
 
-#ifdef DEBUG_ENABLED
-		print_line("- Vulkan subgroup:");
-		print_line("  size: " + itos(subgroup_capabilities.size));
-		print_line("  stages: " + subgroup_capabilities.supported_stages_desc());
-		print_line("  supported ops: " + subgroup_capabilities.supported_operations_desc());
+		print_verbose("- Vulkan subgroup:");
+		print_verbose("  size: " + itos(subgroup_capabilities.size));
+		print_verbose("  stages: " + subgroup_capabilities.supported_stages_desc());
+		print_verbose("  supported ops: " + subgroup_capabilities.supported_operations_desc());
 		if (subgroup_capabilities.quadOperationsInAllStages) {
-			print_line("  quad operations in all stages");
+			print_verbose("  quad operations in all stages");
 		}
 	} else {
-		print_line("- Couldn't call vkGetPhysicalDeviceProperties2");
-#endif
+		print_verbose("- Couldn't call vkGetPhysicalDeviceProperties2");
 	}
 
 	return OK;
@@ -685,6 +680,10 @@ Error VulkanContext::_create_physical_device() {
 
 	inst_initialized = true;
 
+#ifdef USE_VOLK
+	volkLoadInstance(inst);
+#endif
+
 	/* Make initial call to query gpu_count, then second call for gpu info*/
 	err = vkEnumeratePhysicalDevices(inst, &gpu_count, nullptr);
 	ERR_FAIL_COND_V(err, ERR_CANT_CREATE);
@@ -737,10 +736,11 @@ Error VulkanContext::_create_physical_device() {
 	} vendor_names[] = {
 		{ 0x1002, "AMD" },
 		{ 0x1010, "ImgTec" },
+		{ 0x106B, "Apple" },
 		{ 0x10DE, "NVIDIA" },
 		{ 0x13B5, "ARM" },
 		{ 0x5143, "Qualcomm" },
-		{ 0x8086, "INTEL" },
+		{ 0x8086, "Intel" },
 		{ 0, nullptr },
 	};
 	device_name = gpu_props.deviceName;
@@ -757,9 +757,11 @@ Error VulkanContext::_create_physical_device() {
 			vendor_idx++;
 		}
 	}
-#ifdef DEBUG_ENABLED
-	print_line("Using Vulkan Device #" + itos(device_index) + ": " + device_vendor + " - " + device_name);
-#endif
+
+	print_line(
+			"Vulkan API " + itos(vulkan_major) + "." + itos(vulkan_minor) + "." + itos(vulkan_patch) +
+			" - " + "Using Vulkan Device #" + itos(device_index) + ": " + device_vendor + " - " + device_name);
+
 	device_api_version = gpu_props.apiVersion;
 
 	err = vkEnumerateDeviceExtensionProperties(gpu, nullptr, &device_extension_count, nullptr);
@@ -975,37 +977,35 @@ Error VulkanContext::_create_device() {
 		sdevice.queueCreateInfoCount = 2;
 	}
 
-#ifdef VK_VERSION_1_2
 	VkPhysicalDeviceVulkan11Features vulkan11features;
-
-	vulkan11features.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_1_1_FEATURES;
-	vulkan11features.pNext = nullptr;
-	// !BAS! Need to figure out which ones of these we want enabled...
-	vulkan11features.storageBuffer16BitAccess = 0;
-	vulkan11features.uniformAndStorageBuffer16BitAccess = 0;
-	vulkan11features.storagePushConstant16 = 0;
-	vulkan11features.storageInputOutput16 = 0;
-	vulkan11features.multiview = multiview_capabilities.is_supported;
-	vulkan11features.multiviewGeometryShader = multiview_capabilities.geometry_shader_is_supported;
-	vulkan11features.multiviewTessellationShader = multiview_capabilities.tessellation_shader_is_supported;
-	vulkan11features.variablePointersStorageBuffer = 0;
-	vulkan11features.variablePointers = 0;
-	vulkan11features.protectedMemory = 0;
-	vulkan11features.samplerYcbcrConversion = 0;
-	vulkan11features.shaderDrawParameters = 0;
-
-	sdevice.pNext = &vulkan11features;
-#elif VK_VERSION_1_1
 	VkPhysicalDeviceMultiviewFeatures multiview_features;
+	if (vulkan_major > 1 || vulkan_minor >= 2) {
+		vulkan11features.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_1_1_FEATURES;
+		vulkan11features.pNext = nullptr;
+		// !BAS! Need to figure out which ones of these we want enabled...
+		vulkan11features.storageBuffer16BitAccess = 0;
+		vulkan11features.uniformAndStorageBuffer16BitAccess = 0;
+		vulkan11features.storagePushConstant16 = 0;
+		vulkan11features.storageInputOutput16 = 0;
+		vulkan11features.multiview = multiview_capabilities.is_supported;
+		vulkan11features.multiviewGeometryShader = multiview_capabilities.geometry_shader_is_supported;
+		vulkan11features.multiviewTessellationShader = multiview_capabilities.tessellation_shader_is_supported;
+		vulkan11features.variablePointersStorageBuffer = 0;
+		vulkan11features.variablePointers = 0;
+		vulkan11features.protectedMemory = 0;
+		vulkan11features.samplerYcbcrConversion = 0;
+		vulkan11features.shaderDrawParameters = 0;
 
-	multiview_features.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_MULTIVIEW_FEATURES;
-	multiview_features.pNext = nullptr;
-	multiview_features.multiview = multiview_capabilities.is_supported;
-	multiview_features.multiviewGeometryShader = multiview_capabilities.geometry_shader_is_supported;
-	multiview_features.multiviewTessellationShader = multiview_capabilities.tessellation_shader_is_supported;
+		sdevice.pNext = &vulkan11features;
+	} else if (vulkan_major == 1 && vulkan_minor == 1) {
+		multiview_features.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_MULTIVIEW_FEATURES;
+		multiview_features.pNext = nullptr;
+		multiview_features.multiview = multiview_capabilities.is_supported;
+		multiview_features.multiviewGeometryShader = multiview_capabilities.geometry_shader_is_supported;
+		multiview_features.multiviewTessellationShader = multiview_capabilities.tessellation_shader_is_supported;
 
-	sdevice.pNext = &multiview_features;
-#endif
+		sdevice.pNext = &multiview_features;
+	}
 
 	err = vkCreateDevice(gpu, &sdevice, nullptr, &device);
 	ERR_FAIL_COND_V(err, ERR_CANT_CREATE);
@@ -1672,6 +1672,11 @@ Error VulkanContext::_update_swap_chain(Window *window) {
 }
 
 Error VulkanContext::initialize() {
+#ifdef USE_VOLK
+	if (volkInitialize() != VK_SUCCESS) {
+		return FAILED;
+	}
+#endif
 	Error err = _create_physical_device();
 	if (err) {
 		return err;
@@ -2024,7 +2029,11 @@ int VulkanContext::get_swapchain_image_count() const {
 	return swapchainImageCount;
 }
 
-uint32_t VulkanContext::get_graphics_queue() const {
+VkQueue VulkanContext::get_graphics_queue() const {
+	return graphics_queue;
+}
+
+uint32_t VulkanContext::get_graphics_queue_family_index() const {
 	return graphics_queue_family_index;
 }
 

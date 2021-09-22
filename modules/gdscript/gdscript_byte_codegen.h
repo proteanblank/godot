@@ -419,7 +419,7 @@ public:
 	virtual void start_block() override;
 	virtual void end_block() override;
 
-	virtual void write_start(GDScript *p_script, const StringName &p_function_name, bool p_static, MultiplayerAPI::RPCMode p_rpc_mode, const GDScriptDataType &p_return_type) override;
+	virtual void write_start(GDScript *p_script, const StringName &p_function_name, bool p_static, Multiplayer::RPCConfig p_rpc_config, const GDScriptDataType &p_return_type) override;
 	virtual GDScriptFunction *write_end() override;
 
 #ifdef DEBUG_ENABLED
@@ -454,6 +454,7 @@ public:
 	virtual void write_assign_true(const Address &p_target) override;
 	virtual void write_assign_false(const Address &p_target) override;
 	virtual void write_assign_default_parameter(const Address &p_dst, const Address &p_src) override;
+	virtual void write_store_global(const Address &p_dst, int p_global_index) override;
 	virtual void write_store_named_global(const Address &p_dst, const StringName &p_global) override;
 	virtual void write_cast(const Address &p_target, const Address &p_source, const GDScriptDataType &p_type) override;
 	virtual void write_call(const Address &p_target, const Address &p_base, const StringName &p_function_name, const Vector<Address> &p_arguments) override;

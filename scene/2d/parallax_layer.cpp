@@ -30,7 +30,6 @@
 
 #include "parallax_layer.h"
 
-#include "core/config/engine.h"
 #include "parallax_background.h"
 
 void ParallaxLayer::set_motion_scale(const Size2 &p_scale) {
@@ -101,6 +100,10 @@ void ParallaxLayer::_notification(int p_what) {
 			_update_mirroring();
 		} break;
 		case NOTIFICATION_EXIT_TREE: {
+			if (Engine::get_singleton()->is_editor_hint()) {
+				break;
+			}
+
 			set_position(orig_offset);
 			set_scale(orig_scale);
 		} break;

@@ -31,9 +31,8 @@
 #ifndef COLLISION_OBJECT_3D_H
 #define COLLISION_OBJECT_3D_H
 
+#include "scene/3d/camera_3d.h"
 #include "scene/3d/node_3d.h"
-#include "scene/resources/shape_3d.h"
-#include "servers/physics_server_3d.h"
 
 class CollisionObject3D : public Node3D {
 	GDCLASS(CollisionObject3D, Node3D);
@@ -74,6 +73,8 @@ private:
 
 	Map<uint32_t, ShapeData> shapes;
 
+	bool only_update_transform_changes = false; // This is used for sync to physics.
+
 	bool capture_input_on_drag = false;
 	bool ray_pickable = true;
 
@@ -101,12 +102,16 @@ protected:
 	void _on_transform_changed();
 
 	friend class Viewport;
-	virtual void _input_event(Node *p_camera, const Ref<InputEvent> &p_input_event, const Vector3 &p_pos, const Vector3 &p_normal, int p_shape);
+	virtual void _input_event_call(Camera3D *p_camera, const Ref<InputEvent> &p_input_event, const Vector3 &p_pos, const Vector3 &p_normal, int p_shape);
 	virtual void _mouse_enter();
 	virtual void _mouse_exit();
 
 	void set_body_mode(PhysicsServer3D::BodyMode p_mode);
 
+	void set_only_update_transform_changes(bool p_enable);
+	bool is_only_update_transform_changes_enabled() const;
+
+	GDVIRTUAL5(_input_event, Camera3D *, Ref<InputEvent>, Vector3, Vector3, int)
 public:
 	void set_collision_layer(uint32_t p_layer);
 	uint32_t get_collision_layer() const;
@@ -114,11 +119,11 @@ public:
 	void set_collision_mask(uint32_t p_mask);
 	uint32_t get_collision_mask() const;
 
-	void set_collision_layer_bit(int p_bit, bool p_value);
-	bool get_collision_layer_bit(int p_bit) const;
+	void set_collision_layer_value(int p_layer_number, bool p_value);
+	bool get_collision_layer_value(int p_layer_number) const;
 
-	void set_collision_mask_bit(int p_bit, bool p_value);
-	bool get_collision_mask_bit(int p_bit) const;
+	void set_collision_mask_value(int p_layer_number, bool p_value);
+	bool get_collision_mask_value(int p_layer_number) const;
 
 	void set_disable_mode(DisableMode p_mode);
 	DisableMode get_disable_mode() const;

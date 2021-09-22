@@ -52,8 +52,8 @@ class OS {
 	int low_processor_usage_mode_sleep_usec = 10000;
 	bool _verbose_stdout = false;
 	bool _debug_stdout = false;
+	bool _single_window = false;
 	String _local_clipboard;
-	bool _no_window = false;
 	int _exit_code = EXIT_FAILURE; // unexpected exit is marked as failure
 	int _orientation;
 	bool _allow_hidpi = false;
@@ -119,6 +119,8 @@ public:
 	virtual PackedStringArray get_connected_midi_inputs();
 	virtual void open_midi_inputs();
 	virtual void close_midi_inputs();
+
+	virtual void alert(const String &p_alert, const String &p_title = "ALERT!");
 
 	virtual Error open_dynamic_library(const String p_path, void *&p_library_handle, bool p_also_set_library_path = false) { return ERR_UNAVAILABLE; }
 	virtual Error close_dynamic_library(void *p_library_handle) { return ERR_UNAVAILABLE; }
@@ -223,6 +225,8 @@ public:
 	void set_stdout_enabled(bool p_enabled);
 	void set_stderr_enabled(bool p_enabled);
 
+	bool is_single_window() const;
+
 	virtual void disable_crash_handler() {}
 	virtual bool is_disable_crash_handler() const { return false; }
 	virtual void initialize_debugging() {}
@@ -239,6 +243,7 @@ public:
 	RenderThreadMode get_render_thread_mode() const { return _render_thread_mode; }
 
 	virtual String get_locale() const;
+	String get_locale_language() const;
 
 	String get_safe_dir_name(const String &p_dir_name, bool p_allow_dir_separator = false) const;
 	virtual String get_godot_dir_name() const;
@@ -249,7 +254,6 @@ public:
 	virtual String get_bundle_resource_dir() const;
 
 	virtual String get_user_data_dir() const;
-	virtual String get_external_data_dir() const;
 	virtual String get_resource_dir() const;
 
 	enum SystemDir {
@@ -263,12 +267,9 @@ public:
 		SYSTEM_DIR_RINGTONES,
 	};
 
-	virtual String get_system_dir(SystemDir p_dir) const;
+	virtual String get_system_dir(SystemDir p_dir, bool p_shared_storage = true) const;
 
 	virtual Error move_to_trash(const String &p_path) { return FAILED; }
-
-	virtual void set_no_window_mode(bool p_enable);
-	virtual bool is_no_window_mode_enabled() const;
 
 	virtual void debug_break();
 

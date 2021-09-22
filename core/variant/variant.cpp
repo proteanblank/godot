@@ -1627,9 +1627,9 @@ Variant::operator String() const {
 String Variant::stringify(List<const void *> &stack) const {
 	switch (type) {
 		case NIL:
-			return "Null";
+			return "null";
 		case BOOL:
-			return _data._bool ? "True" : "False";
+			return _data._bool ? "true" : "false";
 		case INT:
 			return itos(_data._int);
 		case FLOAT:
@@ -1681,10 +1681,10 @@ String Variant::stringify(List<const void *> &stack) const {
 
 			Vector<_VariantStrPair> pairs;
 
-			for (List<Variant>::Element *E = keys.front(); E; E = E->next()) {
+			for (const Variant &E : keys) {
 				_VariantStrPair sp;
-				sp.key = E->get().stringify(stack);
-				sp.value = d[E->get()].stringify(stack);
+				sp.key = E.stringify(stack);
+				sp.value = d[E].stringify(stack);
 
 				pairs.push_back(sp);
 			}
@@ -2832,7 +2832,7 @@ uint32_t Variant::hash() const {
 			return _data._bool ? 1 : 0;
 		} break;
 		case INT: {
-			return _data._int;
+			return hash_one_uint64((uint64_t)_data._int);
 		} break;
 		case FLOAT: {
 			return hash_djb2_one_float(_data._float);
@@ -2847,8 +2847,8 @@ uint32_t Variant::hash() const {
 			return hash_djb2_one_float(reinterpret_cast<const Vector2 *>(_data._mem)->y, hash);
 		} break;
 		case VECTOR2I: {
-			uint32_t hash = hash_djb2_one_32(reinterpret_cast<const Vector2i *>(_data._mem)->x);
-			return hash_djb2_one_32(reinterpret_cast<const Vector2i *>(_data._mem)->y, hash);
+			uint32_t hash = hash_djb2_one_32((uint32_t) reinterpret_cast<const Vector2i *>(_data._mem)->x);
+			return hash_djb2_one_32((uint32_t) reinterpret_cast<const Vector2i *>(_data._mem)->y, hash);
 		} break;
 		case RECT2: {
 			uint32_t hash = hash_djb2_one_float(reinterpret_cast<const Rect2 *>(_data._mem)->position.x);
@@ -2857,10 +2857,10 @@ uint32_t Variant::hash() const {
 			return hash_djb2_one_float(reinterpret_cast<const Rect2 *>(_data._mem)->size.y, hash);
 		} break;
 		case RECT2I: {
-			uint32_t hash = hash_djb2_one_32(reinterpret_cast<const Rect2i *>(_data._mem)->position.x);
-			hash = hash_djb2_one_32(reinterpret_cast<const Rect2i *>(_data._mem)->position.y, hash);
-			hash = hash_djb2_one_32(reinterpret_cast<const Rect2i *>(_data._mem)->size.x, hash);
-			return hash_djb2_one_32(reinterpret_cast<const Rect2i *>(_data._mem)->size.y, hash);
+			uint32_t hash = hash_djb2_one_32((uint32_t) reinterpret_cast<const Rect2i *>(_data._mem)->position.x);
+			hash = hash_djb2_one_32((uint32_t) reinterpret_cast<const Rect2i *>(_data._mem)->position.y, hash);
+			hash = hash_djb2_one_32((uint32_t) reinterpret_cast<const Rect2i *>(_data._mem)->size.x, hash);
+			return hash_djb2_one_32((uint32_t) reinterpret_cast<const Rect2i *>(_data._mem)->size.y, hash);
 		} break;
 		case TRANSFORM2D: {
 			uint32_t hash = 5831;
@@ -2878,9 +2878,9 @@ uint32_t Variant::hash() const {
 			return hash_djb2_one_float(reinterpret_cast<const Vector3 *>(_data._mem)->z, hash);
 		} break;
 		case VECTOR3I: {
-			uint32_t hash = hash_djb2_one_32(reinterpret_cast<const Vector3i *>(_data._mem)->x);
-			hash = hash_djb2_one_32(reinterpret_cast<const Vector3i *>(_data._mem)->y, hash);
-			return hash_djb2_one_32(reinterpret_cast<const Vector3i *>(_data._mem)->z, hash);
+			uint32_t hash = hash_djb2_one_32((uint32_t) reinterpret_cast<const Vector3i *>(_data._mem)->x);
+			hash = hash_djb2_one_32((uint32_t) reinterpret_cast<const Vector3i *>(_data._mem)->y, hash);
+			return hash_djb2_one_32((uint32_t) reinterpret_cast<const Vector3i *>(_data._mem)->z, hash);
 		} break;
 		case PLANE: {
 			uint32_t hash = hash_djb2_one_float(reinterpret_cast<const Plane *>(_data._mem)->normal.x);
@@ -3533,12 +3533,13 @@ void Variant::register_types() {
 	_register_variant_methods();
 	_register_variant_setters_getters();
 	_register_variant_constructors();
+	_register_variant_destructors();
 	_register_variant_utility_functions();
 }
 void Variant::unregister_types() {
 	_unregister_variant_operators();
 	_unregister_variant_methods();
 	_unregister_variant_setters_getters();
-	_unregister_variant_constructors();
+	_unregister_variant_destructors();
 	_unregister_variant_utility_functions();
 }

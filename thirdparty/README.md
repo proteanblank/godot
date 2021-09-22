@@ -31,14 +31,9 @@ Files extracted from upstream source:
 
 ## certs
 
-- Upstream: Mozilla, via https://apps.fedoraproject.org/packages/ca-certificates
-- Version: 2018.2.26 (2018)
+- Upstream: Mozilla, via https://github.com/bagder/ca-bundle
+- Version: git (8b263a18fca98ea371e54227837321c5cdaa1ba7, 2021)
 - License: MPL 2.0
-
-File extracted from a recent Fedora install:
-/etc/pki/ca-trust/extracted/pem/tls-ca-bundle.pem
-(It can't be extracted directly from the package,
-as it's generated on the user's system.)
 
 
 ## cvtt
@@ -64,7 +59,7 @@ Extracted from .zip provided. Extracted license and header only.
 ## embree
 
 - Upstream: https://github.com/embree/embree
-- Version: 3.13.0 (7c53133eb21424f7f0ae1e25bf357e358feaf6ab, 2021)
+- Version: 3.13.1 (12b99393438a4cc9e478e33459eed78bec6233fd, 2021)
 - License: Apache 2.0
 
 Files extracted from upstream:
@@ -108,7 +103,7 @@ will limit its functionality to IPv4 only.
 ## etcpak
 
 - Upstream: https://github.com/wolfpld/etcpak
-- Version: git (f27daea656ff77671580f838a889e33049430ebd, 2021)
+- Version: git (7c3cb6fe708d4ae330b0ab2af1ad472bae2a37a2, 2021)
 - License: BSD-3-Clause
 
 Files extracted from upstream source:
@@ -123,9 +118,9 @@ Files extracted from upstream source:
 
 ## fonts
 
-- `NotoSans*.ttf`, `NotoNaskhArabicUI_Regular.ttf`:
-  * Upstream: https://github.com/googlei18n/noto-fonts
-  * Version: 1.06 (2017)
+- `NotoSans*.ttf`, `NotoNaskhArabicUI_*.ttf`:
+  * Upstream: https://github.com/googlefonts/noto-fonts
+  * Version: v2017-10-24-phase3-second-cleanup
   * License: OFL-1.1
   * Comment: Use UI font variant if available, because it has tight vertical metrics and
     good for UI.
@@ -164,7 +159,7 @@ Files extracted from upstream source:
 ## glslang
 
 - Upstream: https://github.com/KhronosGroup/glslang
-- Version: git (dd69df7f3dac26362e10b0f38efb9e47990f7537, 2020)
+- Version: 11.6.0 (2fb89a0072ae7316af1c856f22663fde4928128a, 2021)
 - License: glslang
 
 Version should be kept in sync with the one of the used Vulkan SDK (see `vulkan`
@@ -178,7 +173,7 @@ Files extracted from upstream source:
 - Run `cmake . && make` and copy generated `include/glslang/build_info.h`
   to `glslang/build_info.h`
 - `LICENSE.txt`
-- Unnecessary files like `CMakeLists.txt` and `updateGrammar` removed.
+- Unnecessary files like `CMakeLists.txt`, `*.m4` and `updateGrammar` removed.
 
 
 ## graphite
@@ -197,13 +192,13 @@ Files extracted from upstream source:
 ## harfbuzz
 
 - Upstream: https://github.com/harfbuzz/harfbuzz
-- Version: 2.8.0 (03538e872a0610a65fad692b33d3646f387cf578, 2021)
+- Version: 3.0.0 (9c387e20d65a7a366ac270d789f6ad266014c9e0, 2021)
 - License: MIT
 
 Files extracted from upstream source:
 
 - the `src` folder
-- `AUTHORS`, `COPYING`, `NEWS`, `THANKS`
+- `AUTHORS`, `COPYING`, `THANKS`
 
 
 ## icu4c
@@ -347,21 +342,21 @@ changes are marked with `// -- GODOT --` comments.
 ## mbedtls
 
 - Upstream: https://tls.mbed.org/
-- Version: 2.16.10 (d61fa61bef06b64132e3490543c81b8ee40fbee3, 2021)
+- Version: 2.16.11 (aa1d4e097342af799ba80dfb13640efef498227c, 2021)
 - License: Apache 2.0
 
 File extracted from upstream release tarball:
 
-- All `*.h` from `include/mbedtls/` to `thirdparty/mbedtls/include/mbedtls/`
-- All `*.c` from `library/` to `thirdparty/mbedtls/library/`
-- LICENSE and apache-2.0.txt files
-- Applied the patch in `thirdparty/mbedtls/patches/1453.diff` (PR 1453).
-  Soon to be merged upstream. Check it out at next update.
+- All `*.h` from `include/mbedtls/` to `thirdparty/mbedtls/include/mbedtls/`.
+- All `*.c` from `library/` to `thirdparty/mbedtls/library/`.
+- `LICENSE` and `apache-2.0.txt` files.
+- Applied the patch in `thirdparty/mbedtls/patches/1453.diff` (upstream PR:
+  https://github.com/ARMmbed/mbedtls/pull/1453).
 - Applied the patch in `thirdparty/mbedtls/patches/padlock.diff`. This disables
   VIA padlock support which defines a symbol `unsupported` which clashes with
   a pre-defined symbol.
-- Added 2 files `godot_core_mbedtls_platform.{c,h}` providing configuration
-  for light bundling with core.
+- Added 2 files `godot_core_mbedtls_platform.c` and `godot_core_mbedtls_config.h`
+  providing configuration for light bundling with core.
 
 
 ## meshoptimizer
@@ -477,20 +472,29 @@ Collection of single-file libraries used in Godot components.
   * Upstream: https://github.com/nothings/stb
   * Version: 1.00 (2bb4a0accd4003c1db4c24533981e01b1adfd656, 2019)
   * License: Public Domain or Unlicense or MIT
-- `stb_vorbis.c`
-  * Upstream: https://github.com/nothings/stb
-  * Version: 1.20 (314d0a6f9af5af27e585336eecea333e95c5a2d8, 2020)
-  * License: Public Domain or Unlicense or MIT
 - `yuv2rgb.h`
   * Upstream: http://wss.co.uk/pinknoise/yuv2rgb/ (to check)
   * Version: ?
   * License: BSD
 
 
+## msdfgen
+
+- Upstream: https://github.com/Chlumsky/msdfgen
+- Version: 1.9.1 (1b3b6b985094e6f12751177490add3ad11dd91a9, 2010)
+- License: MIT
+
+Files extracted from the upstream source:
+
+- `msdfgen.h`
+- Files in `core/` folder.
+- `LICENSE.txt` and `CHANGELOG.md`
+
+
 ## nanosvg
 
 - Upstream: https://github.com/memononen/nanosvg
-- Version: git (3e403ec72a9145cbbcc6c63d94a4caf079aafec2, 2020)
+- Version: git (ccdb1995134d340a93fb20e3a3d323ccb3838dd0, 2021)
 - License: zlib
 
 Files extracted from the upstream source:
@@ -607,8 +611,11 @@ Godot. Please check the file to know what's new.
 ## spirv-reflect
 
 - Upstream: https://github.com/KhronosGroup/SPIRV-Reflect
-- Version: git (c0ce03a43ca77fedb5abfd1976ae2fd0eeb0e611, 2021)
+- Version: git (cc937caab141d889c9c9dff572c5a6854d5cf9b4, 2021)
 - License: Apache 2.0
+
+Does not track Vulkan SDK releases closely, but try to package a commit newer
+than the matching glslang and Vulkan headers, just in case.
 
 Files extracted from upstream source:
 
@@ -665,31 +672,45 @@ They can be reapplied using the patches included in the `vhacd`
 folder.
 
 
-## vulkan
+## volk
 
-- Upstream: https://github.com/KhronosGroup/Vulkan-Loader
-- Version: sdk-1.2.162.0 (7a313093b5c4af964d50a5a64e73d7df6152ea3f, 2020)
-- License: Apache 2.0
+- Upstream: https://github.com/zeux/volk
+- Version: 1.2.190 (760a782f295a66de7391d6ed573d65e3fb1c8450, 2021)
+- License: MIT
 
 Unless there is a specific reason to package a more recent version, please stick
-to Vulkan SDK releases (prefixed by `sdk-`) for all components.
+to tagged releases. All Vulkan libraries and headers should be kept in sync so:
 
-NOTE: Use `scripts/update_deps.py --ref <version>` in the Loader git repository
-to retrieve the `Vulkan-Headers` repository matching the loader version.
+- Update Vulkan SDK components to the matching tag (see "vulkan").
+- Update glslang (see "glslang").
+- Update spirv-reflect (see "spirv-reflect").
+
 
 Files extracted from upstream source:
 
-- `Vulkan-Headers/include/` as `include/`
-- All `.c` and `.h` files in `loader/` and `loader/generated/`, put in a common
-  `loader/` folder
+- `volk.h`, `volk.c`
+- `LICENSE.md`
+
+
+## vulkan
+
+- Upstream: https://github.com/KhronosGroup/Vulkan-Headers
+- Version: 1.2.190 (9e62d027636cd7210f60d934f56107ed6e1579b8, 2021)
+- License: Apache 2.0
+
+The vendored version should be kept in sync with volk, see above.
+
+Files extracted from upstream source:
+
+- `include/`
 - `LICENSE.txt`
 
 `vk_enum_string_helper.h` is taken from the matching `Vulkan-ValidationLayers`
 SDK release: https://github.com/KhronosGroup/Vulkan-ValidationLayers/blob/master/layers/generated/vk_enum_string_helper.h
 
 `vk_mem_alloc.h` is taken from https://github.com/GPUOpen-LibrariesAndSDKs/VulkanMemoryAllocator
-Version: 2.3.0 (2019)
-`vk_mem_alloc.cpp` and `android/vk_mem_alloc.cpp` are Godot files and should be preserved on updates.
+Version: 3.0.0-development (2021-07-07), branch `feature-small-buffers`, commit `cfea2f72851f9ee4a399769f18865047b83711f1`
+`vk_mem_alloc.cpp` is a Godot file and should be preserved on updates.
 
 Patches in the `patches` directory should be re-applied after updates.
 
