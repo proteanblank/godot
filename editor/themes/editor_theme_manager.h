@@ -62,6 +62,7 @@ class EditorThemeManager {
 
 		int base_spacing = 4;
 		int extra_spacing = 0;
+		Size2 dialogs_buttons_min_size = Size2(105, 34);
 		int border_width = 0;
 		int corner_radius = 3;
 
@@ -134,6 +135,7 @@ class EditorThemeManager {
 		Ref<StyleBoxFlat> button_style_hover;
 
 		Ref<StyleBoxFlat> popup_style;
+		Ref<StyleBoxFlat> popup_border_style;
 		Ref<StyleBoxFlat> window_style;
 		Ref<StyleBoxFlat> dialog_style;
 		Ref<StyleBoxFlat> panel_container_style;
@@ -156,6 +158,7 @@ class EditorThemeManager {
 
 	static void _generate_text_editor_defaults(ThemeConfiguration &p_config);
 	static void _populate_text_editor_styles(const Ref<EditorTheme> &p_theme, ThemeConfiguration &p_config);
+	static void _populate_visual_shader_styles(const Ref<EditorTheme> &p_theme, ThemeConfiguration &p_config);
 
 	static void _reset_dirty_flag();
 

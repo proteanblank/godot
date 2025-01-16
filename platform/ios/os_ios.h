@@ -34,8 +34,8 @@
 #ifdef IOS_ENABLED
 
 #import "ios.h"
-#import "joypad_ios.h"
 
+#import "drivers/apple/joypad_apple.h"
 #import "drivers/coreaudio/audio_driver_coreaudio.h"
 #include "drivers/unix/os_unix.h"
 #include "servers/audio_server.h"
@@ -58,7 +58,7 @@ private:
 
 	iOS *ios = nullptr;
 
-	JoypadIOS *joypad_ios = nullptr;
+	JoypadApple *joypad_apple = nullptr;
 
 	MainLoop *main_loop = nullptr;
 
@@ -103,7 +103,7 @@ public:
 	virtual Vector<String> get_system_font_path_for_text(const String &p_font_name, const String &p_text, const String &p_locale = String(), const String &p_script = String(), int p_weight = 400, int p_stretch = 100, bool p_italic = false) const override;
 	virtual String get_system_font_path(const String &p_font_name, int p_weight = 400, int p_stretch = 100, bool p_italic = false) const override;
 
-	virtual Error open_dynamic_library(const String &p_path, void *&p_library_handle, bool p_also_set_library_path = false, String *r_resolved_path = nullptr) override;
+	virtual Error open_dynamic_library(const String &p_path, void *&p_library_handle, GDExtensionData *p_data = nullptr) override;
 	virtual Error close_dynamic_library(void *p_library_handle) override;
 	virtual Error get_dynamic_library_symbol_handle(void *p_library_handle, const String &p_name, void *&p_symbol_handle, bool p_optional = false) override;
 
@@ -114,16 +114,17 @@ public:
 
 	virtual Error shell_open(const String &p_uri) override;
 
-	virtual String get_user_data_dir() const override;
+	virtual String get_user_data_dir(const String &p_user_dir) const override;
 
 	virtual String get_cache_path() const override;
+	virtual String get_temp_path() const override;
 
 	virtual String get_locale() const override;
 
 	virtual String get_unique_id() const override;
 	virtual String get_processor_name() const override;
 
-	virtual void vibrate_handheld(int p_duration_ms = 500) override;
+	virtual void vibrate_handheld(int p_duration_ms = 500, float p_amplitude = -1.0) override;
 
 	virtual bool _check_internal_feature_support(const String &p_feature) override;
 
